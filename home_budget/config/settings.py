@@ -70,7 +70,7 @@ DATABASES = {
     "default": dj_database_url.config(
         default=env_str(
             os.environ.get("DATABASE_URL"),
-            "postgresql://homebudget:homebudget@db:5432/homebudget",
+            "postgresql://dualspendcalculator:dualspendcalculator@db:5432/dualspendcalculator",
         ),
         conn_max_age=60,
     )

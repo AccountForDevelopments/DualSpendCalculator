@@ -1,18 +1,18 @@
 services:
   db:
     image: postgres:16-alpine
-    container_name: homebudget_app_db
+    container_name: dualspendcalculator_db
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-homebudget_app}
-      POSTGRES_USER: ${POSTGRES_USER:-homebudget}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-homebudget}
+      POSTGRES_DB: ${POSTGRES_DB:-dualspendcalculator}
+      POSTGRES_USER: ${POSTGRES_USER:-dualspendcalculator}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dualspendcalculator}
     volumes:
-      - postgres_data_app:/var/lib/postgresql/data
+      - dualspendcalculator_postgres_data:/var/lib/postgresql/data
 
   web:
     build:
       context: .
-    container_name: homebudget_app_web
+    container_name: dualspendcalculator_web
     env_file:
       - .env
     depends_on:
@@ -24,6 +24,5 @@ services:
     command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
 
 volumes:
-  postgres_data_app:
-
+  dualspendcalculator_postgres_data:
 
