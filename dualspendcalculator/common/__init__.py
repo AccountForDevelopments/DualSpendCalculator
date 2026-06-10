@@ -8,11 +8,8 @@ common アプリ
 
 ディレクトリ構造:
     common/
-    ├── text/           # テキスト処理
-    │   ├── encoding.py # 文字コード判定
-    │   └── parsing.py  # 日付・金額パース
     ├── env.py          # 環境変数の解釈
-    └── RULES.md        # 配置ルール
+    └── text.py         # 文字コード判定・日付・金額パース
 
 使用例:
     from common.text import detect_encoding, parse_date, parse_amount
