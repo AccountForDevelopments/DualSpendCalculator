@@ -7,7 +7,7 @@
 <div class="page-container">
     <div class="page-header">
         <div class="page-header-content">
-            <h1 class="page-title">📅 月次管理</h1>
+            <h1 class="page-title">月次管理</h1>
             <p class="page-subtitle">対象月の一覧と新規作成</p>
         </div>
         <div class="page-actions">
@@ -69,7 +69,6 @@
             </div>
             {% else %}
             <div class="empty-state">
-                <div class="empty-icon">📆</div>
                 <h3 class="empty-title">対象月がありません</h3>
                 <p class="empty-message">「新規作成」ボタンから対象月を作成してください</p>
                 <a href="{% url 'budgets:month_create' %}" class="btn btn-primary">

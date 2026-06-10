@@ -48,7 +48,6 @@
                 <!-- 警告メッセージ -->
                 {% if settlement.income_missing %}
                 <div class="warning-box">
-                    <span class="warning-icon">⚠️</span>
                     <div class="warning-content">
                         <div class="warning-title">収入が未入力です</div>
                         <div class="warning-text">
@@ -61,7 +60,6 @@
                 
                 {% if settlement.payer_missing_count > 0 %}
                 <div class="warning-box">
-                    <span class="warning-icon">⚠️</span>
                     <div class="warning-content">
                         <div class="warning-title">支払者が未設定の明細があります</div>
                         <div class="warning-text">
@@ -92,7 +90,7 @@
                 <!-- ユーザー別詳細 -->
                 <div class="settlement-grid">
                     <div class="settlement-user">
-                        <div class="settlement-user-name">👤 {{ settlement.user_a_name }}</div>
+                        <div class="settlement-user-name">{{ settlement.user_a_name }}</div>
                         <div class="settlement-detail">
                             <span class="settlement-detail-label">月収</span>
                             <span class="settlement-detail-value settlement-detail-value--amount">
@@ -120,7 +118,7 @@
                     </div>
                     
                     <div class="settlement-user">
-                        <div class="settlement-user-name">👤 {{ settlement.user_b_name }}</div>
+                        <div class="settlement-user-name">{{ settlement.user_b_name }}</div>
                         <div class="settlement-detail">
                             <span class="settlement-detail-label">月収</span>
                             <span class="settlement-detail-value settlement-detail-value--amount">
@@ -171,7 +169,6 @@
             <h3 class="links-title">クイックリンク</h3>
             <div class="links-grid">
                 <a href="{% url 'budgets:month_list' %}" class="link-card">
-                    <span class="link-icon">📅</span>
                     <span class="link-text">月次管理</span>
                 </a>
             </div>
@@ -181,7 +178,6 @@
         <!-- 月次データがない場合 -->
         <div class="summary-card">
             <div class="card-header">
-                <span class="card-icon">📊</span>
                 <h2 class="card-title">精算サマリ</h2>
             </div>
             <div class="card-body">
@@ -195,7 +191,6 @@
             <h3 class="links-title">クイックリンク</h3>
             <div class="links-grid">
                 <a href="{% url 'budgets:month_list' %}" class="link-card">
-                    <span class="link-icon">📅</span>
                     <span class="link-text">月次管理</span>
                 </a>
             </div>

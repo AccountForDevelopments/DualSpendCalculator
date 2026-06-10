@@ -2,7 +2,6 @@
 <!-- フィルタフォーム -->
 <div class="card filter-card">
     <div class="card-header">
-        <span class="card-icon">🔍</span>
         <h2 class="card-title">フィルタ</h2>
     </div>
     <div class="card-body">
@@ -40,7 +39,6 @@
 <!-- 一括操作 & 明細一覧 -->
 <div class="card">
     <div class="card-header">
-        <span class="card-icon">📝</span>
         <h2 class="card-title">明細 ({{ page_obj.paginator.count }}件)</h2>
     </div>
     <div class="card-body">
@@ -53,16 +51,16 @@
             <div class="bulk-actions">
                 <div class="bulk-buttons">
                     <button type="submit" name="action" value="include" class="btn btn-success btn-sm">
-                        ✅ 生活費に含める
+                        生活費に含める
                     </button>
                     <button type="submit" name="action" value="exclude" class="btn btn-outline btn-sm">
-                        ❌ 生活費から除外
+                        生活費から除外
                     </button>
                     <button type="submit" name="action" value="payer_a" class="btn btn-info btn-sm">
-                        👤 {{ month.user_a.username }}が支払い
+                        {{ month.user_a.username }}が支払い
                     </button>
                     <button type="submit" name="action" value="payer_b" class="btn btn-info btn-sm">
-                        👤 {{ month.user_b.username }}が支払い
+                        {{ month.user_b.username }}が支払い
                     </button>
                     <span class="bulk-btn-separator">|</span>
                     <button type="button"
@@ -72,7 +70,7 @@
                             title="1件以上選択してください"
                             data-agreement-url="{% url 'budgets:agreement_download' %}"
                             data-month-id="{{ month.pk }}">
-                        📄 同意書を作成
+                        同意書を作成
                     </button>
                 </div>
                 <div class="bulk-info">
