@@ -42,22 +42,9 @@ class BulkTransactionActionService:
             id__in=selected_ids,
             monthly_budget=monthly_budget,
         )
-        count = transactions.count()
 
-        if action == "include":
-            transactions.update(is_living_cost=True)
-            return BulkActionResult(
-                level="success",
-                message=f"{count}件を生活費に含めました",
-                updated_count=count,
-            )
         if action == "exclude":
-            transactions.update(is_living_cost=False)
-            return BulkActionResult(
-                level="success",
-                message=f"{count}件を生活費から除外しました",
-                updated_count=count,
-            )
+            return self._apply_exclude_update(transactions)
         if action == "payer_a":
             return self._apply_payer_update(
                 transactions,
@@ -76,6 +63,25 @@ class BulkTransactionActionService:
             message="不正な操作です",
         )
 
+    def _apply_exclude_update(self, transactions) -> BulkActionResult:
+        """生活費から除外し、Ajax 用の更新明細リストを返す。"""
+        tx_ids = list(transactions.values_list("id", flat=True))
+        count = len(tx_ids)
+        transactions.update(is_living_cost=False, payer=None)
+        updated_transactions = [
+            {
+                "id": tx_id,
+                "payer_username": None,
+            }
+            for tx_id in tx_ids
+        ]
+        return BulkActionResult(
+            level="success",
+            message=f"{count}件を生活費から除外しました",
+            updated_count=count,
+            updated_transactions=updated_transactions,
+        )
+
     def _apply_payer_update(
         self,
         transactions,
@@ -86,7 +92,7 @@ class BulkTransactionActionService:
         """支払者を一括更新し、Ajax 用の更新明細リストを返す。"""
         tx_ids = list(transactions.values_list("id", flat=True))
         count = len(tx_ids)
-        transactions.update(payer=payer)
+        transactions.update(payer=payer, is_living_cost=True)
         updated_transactions = [
             {
                 "id": tx.id,
@@ -96,7 +102,7 @@ class BulkTransactionActionService:
         ]
         return BulkActionResult(
             level="success",
-            message=f"{count}件の支払者を{username_for_message}に設定しました",
+            message=f"{count}件を生活費に含め、支払者を{username_for_message}に設定しました",
             updated_count=count,
             updated_transactions=updated_transactions,
         )

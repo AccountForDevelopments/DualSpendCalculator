@@ -82,9 +82,8 @@ class TransactionEditForm(forms.ModelForm):
     
     class Meta:
         model = Transaction
-        fields = ["is_living_cost", "payer", "category", "memo"]
+        fields = ["payer", "category", "memo"]
         widgets = {
-            "is_living_cost": forms.CheckboxInput(attrs={"class": "form-checkbox"}),
             "payer": forms.Select(attrs={"class": "form-input"}),
             "category": forms.Select(attrs={"class": "form-input"}),
             "memo": forms.Textarea(attrs={
@@ -107,4 +106,11 @@ class TransactionEditForm(forms.ModelForm):
             self.fields["payer"].queryset = User.objects.filter(
                 id__in=[mb.user_a.id, mb.user_b.id]
             )
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.is_living_cost = instance.payer is not None
+        if commit:
+            instance.save()
+        return instance
 

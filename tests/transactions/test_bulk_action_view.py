@@ -1,6 +1,5 @@
 """BulkActionView のテスト。"""
 import pytest
-from django.contrib.messages import get_messages
 from django.test import Client
 from django.urls import reverse
 
@@ -58,12 +57,12 @@ class Test_BulkActionView:
         assert data["message"] == "明細を選択してください"
 
     @pytest.mark.django_db
-    def test_通常POSTのときリダイレクトとメッセージが返る(
+    def test_AjaxでexcludeのときJSONが返る(
         self, user_a, user_b, monthly_budget, living_cost_transactions
     ):
         # Arrange
         mb = monthly_budget(user_a, user_b)
-        txs = living_cost_transactions(mb, [(5000, None)])
+        txs = living_cost_transactions(mb, [(5000, user_a)])
         client = Client()
         client.force_login(user_a)
         url = reverse("transactions:bulk_action", kwargs={"pk": mb.pk})
@@ -71,11 +70,18 @@ class Test_BulkActionView:
         # Act
         response = client.post(
             url,
-            {"action": "include", "selected": [str(txs[0].id)]},
+            {"action": "exclude", "selected": [str(txs[0].id)]},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
         )
 
         # Assert
-        assert response.status_code == 302
-        assert response.url == reverse("budgets:month_detail", kwargs={"pk": mb.pk})
-        messages = list(get_messages(response.wsgi_request))
-        assert any("生活費に含めました" in str(m) for m in messages)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["level"] == "success"
+        assert data["updated_count"] == 1
+        assert "生活費から除外しました" in data["message"]
+        assert data["updated"][0]["id"] == txs[0].id
+        assert data["updated"][0]["payer_username"] is None
+        txs[0].refresh_from_db()
+        assert txs[0].is_living_cost is False
+        assert txs[0].payer_id is None

@@ -50,31 +50,22 @@
             <!-- 一括操作ボタン -->
             <div class="bulk-actions bulk-actions--inactive">
                 <div class="bulk-buttons">
-                    <button type="submit"
-                            name="action"
-                            value="include"
-                            class="btn btn-primary btn-sm bulk-action-btn"
-                            disabled
-                            title="1件以上選択してください">
-                        生活費に含める
-                    </button>
-                    <button type="submit"
-                            name="action"
-                            value="exclude"
-                            class="btn btn-outline btn-sm bulk-action-btn"
+                    <button type="button"
+                            class="btn btn-outline btn-sm bulk-action-btn bulk-ajax-btn"
+                            data-action="exclude"
                             disabled
                             title="1件以上選択してください">
                         生活費から除外
                     </button>
                     <button type="button"
-                            class="btn btn-outline btn-sm bulk-action-btn bulk-payer-btn"
+                            class="btn btn-outline btn-sm bulk-action-btn bulk-ajax-btn"
                             data-action="payer_a"
                             disabled
                             title="1件以上選択してください">
                         {{ month.user_a.username }}が支払い
                     </button>
                     <button type="button"
-                            class="btn btn-outline btn-sm bulk-action-btn bulk-payer-btn"
+                            class="btn btn-outline btn-sm bulk-action-btn bulk-ajax-btn"
                             data-action="payer_b"
                             disabled
                             title="1件以上選択してください">
@@ -107,7 +98,6 @@
                             <th>日付</th>
                             <th>摘要</th>
                             <th class="text-right">金額</th>
-                            <th>生活費</th>
                             <th>支払者</th>
                             <th>カテゴリ</th>
                             <th></th>
@@ -115,20 +105,13 @@
                     </thead>
                     <tbody>
                         {% for tx in transactions %}
-                        <tr class="{% if tx.is_living_cost %}row-living-cost{% endif %}" data-tx-id="{{ tx.id }}">
+                        <tr class="{% if tx.payer %}row-living-cost{% endif %}" data-tx-id="{{ tx.id }}">
                             <td class="cell-checkbox">
                                 <input type="checkbox" name="selected" value="{{ tx.id }}" class="select-row">
                             </td>
                             <td>{{ tx.date|date:"m/d" }}</td>
                             <td class="cell-truncate" title="{{ tx.description }}">{{ tx.description }}</td>
                             <td class="text-right cell-amount">¥{{ tx.amount|intcomma }}</td>
-                            <td>
-                                {% if tx.is_living_cost %}
-                                <span class="badge badge-success">対象</span>
-                                {% else %}
-                                <span class="badge badge-muted">-</span>
-                                {% endif %}
-                            </td>
                             <td class="cell-payer">
                                 {% if tx.payer %}
                                 <span class="badge badge-payer">{{ tx.payer.username }}</span>

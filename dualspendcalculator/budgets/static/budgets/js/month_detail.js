@@ -3,13 +3,13 @@
  *
  * 機能:
  * - 一括選択（全選択/個別選択）
- * - 支払者の一括設定（Ajax）
+ * - 一括操作（除外・支払者設定）の Ajax 実行
  * - 同意書ダウンロード
  */
 
 document.addEventListener('DOMContentLoaded', function() {
     initSelectAll();
-    initBulkPayerActions();
+    initBulkAjaxActions();
     initAgreementButton();
 });
 
@@ -78,16 +78,16 @@ function initSelectAll() {
 }
 
 /**
- * 支払者一括設定を Ajax で実行する
+ * 一括操作（除外・支払者設定）を Ajax で実行する
  */
-function initBulkPayerActions() {
+function initBulkAjaxActions() {
     const form = document.getElementById('bulk-form');
     if (!form) return;
 
-    const payerButtons = document.querySelectorAll('.bulk-payer-btn');
-    if (payerButtons.length === 0) return;
+    const ajaxButtons = document.querySelectorAll('.bulk-ajax-btn');
+    if (ajaxButtons.length === 0) return;
 
-    payerButtons.forEach(btn => {
+    ajaxButtons.forEach(btn => {
         btn.addEventListener('click', async function() {
             if (btn.disabled) return;
 
@@ -95,7 +95,7 @@ function initBulkPayerActions() {
             const selectedIds = getSelectedTransactionIds();
             if (selectedIds.length === 0) return;
 
-            await submitPayerAction(form, action, selectedIds);
+            await submitBulkAction(form, action, selectedIds);
         });
     });
 }
@@ -108,9 +108,9 @@ function getSelectedTransactionIds() {
 }
 
 /**
- * 支払者一括設定を POST し、該当行のバッジを更新する
+ * 一括操作を POST し、該当行の表示を更新する
  */
-async function submitPayerAction(form, action, selectedIds) {
+async function submitBulkAction(form, action, selectedIds) {
     const csrfToken = form.querySelector('[name=csrfmiddlewaretoken]').value;
     const bulkButtons = document.querySelectorAll('.bulk-action-btn');
     const formData = new FormData();
@@ -141,6 +141,7 @@ async function submitPayerAction(form, action, selectedIds) {
         if (data.level === 'success' && data.updated) {
             data.updated.forEach(item => {
                 updatePayerCell(item.id, item.payer_username);
+                updateRowLivingCostClass(item.id, Boolean(item.payer_username));
             });
             clearSelectedRows();
         }
@@ -166,6 +167,16 @@ function updatePayerCell(txId, payerUsername) {
     } else {
         cell.innerHTML = '<span class="badge badge-warning">未設定</span>';
     }
+}
+
+/**
+ * 生活費対象行の背景クラスを更新する
+ */
+function updateRowLivingCostClass(txId, isLivingCost) {
+    const row = document.querySelector(`tr[data-tx-id="${txId}"]`);
+    if (!row) return;
+
+    row.classList.toggle('row-living-cost', isLivingCost);
 }
 
 /**
