@@ -18,7 +18,7 @@ services:
     depends_on:
       - db
     volumes:
-      - ./home_budget:/app/home_budget
+      - ./dualspendcalculator:/app/dualspendcalculator
     ports:
       - "${HOST_WEB_PORT:-8000}:8000"
     command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]

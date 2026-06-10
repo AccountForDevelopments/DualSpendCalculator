@@ -19,9 +19,9 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
-COPY home_budget/ /app/home_budget/
+COPY dualspendcalculator/ /app/dualspendcalculator/
 
-WORKDIR /app/home_budget
+WORKDIR /app/dualspendcalculator
 EXPOSE 8000
 
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
