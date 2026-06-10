@@ -13,6 +13,12 @@
         <div class="card-body">
             <form method="post" class="form">
                 {% csrf_token %}
+
+                {% if not can_create_month %}
+                <div class="alert alert-warning">
+                    <p>ユーザーが2名以上必要です。管理画面でユーザーを作成してください。</p>
+                </div>
+                {% endif %}
                 
                 {% if form.errors %}
                 <div class="alert alert-error">
@@ -31,7 +37,7 @@
                 </div>
 
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn btn-primary"{% if not can_create_month %} disabled{% endif %}>
                         作成する
                     </button>
                     <a href="{% url 'budgets:month_list' %}" class="btn btn-outline">

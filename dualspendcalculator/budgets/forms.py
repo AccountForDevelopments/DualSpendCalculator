@@ -1,6 +1,7 @@
 import re
 
 from django import forms
+from django.contrib.auth.models import User
 
 from .models import MonthlyBudget
 
@@ -31,6 +32,19 @@ class MonthlyBudgetCreateForm(forms.ModelForm):
             raise forms.ValidationError("その月は既に存在します")
         
         return year_month
+
+    def clean(self):
+        cleaned_data = super().clean()
+        user_count = (
+            User.objects.filter(is_active=True)
+            .exclude(is_superuser=True)
+            .count()
+        )
+        if user_count < 2:
+            raise forms.ValidationError(
+                "ユーザーが2名以上必要です。管理画面でユーザーを作成してください。"
+            )
+        return cleaned_data
 
 
 class IncomeForm(forms.ModelForm):

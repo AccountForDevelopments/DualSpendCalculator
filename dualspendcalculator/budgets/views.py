@@ -39,20 +39,15 @@ class MonthCreateView(LoginRequiredMixin, CreateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["users"] = User.objects.filter(is_active=True).exclude(is_superuser=True)
+        users = User.objects.filter(is_active=True).exclude(is_superuser=True)
+        context["users"] = users
+        context["can_create_month"] = users.count() >= 2
         return context
 
     def form_valid(self, form):
-        # ユーザーA/Bを設定（アクティブな非スーパーユーザーから取得）
         users = User.objects.filter(is_active=True).exclude(is_superuser=True).order_by("id")[:2]
-        
-        if len(users) < 2:
-            messages.error(self.request, "ユーザーが2名以上必要です。管理画面でユーザーを作成してください。")
-            return self.form_invalid(form)
-        
         form.instance.user_a = users[0]
         form.instance.user_b = users[1]
-        
         messages.success(self.request, f"{form.instance.year_month} を作成しました")
         return super().form_valid(form)
 
