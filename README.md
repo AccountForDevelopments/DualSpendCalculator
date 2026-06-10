@@ -1,196 +1,145 @@
 # DualSpendCalculator
 
-家計簿アプリケーションのソースコードを管理するリポジトリです。
-この README は、**Docker のみ**でローカル環境を起動し、ブラウザでログイン画面を確認できるところまでを再現する手順書です。
+## プロジェクト概要
 
-## 前提条件
+**DualSpendCalculator** は、同棲カップルの共同生活費を **収入比で按分**し、月次の **立替精算額** を算出する Django Web アプリです。
 
-| 項目 | 要件 |
-|------|------|
-| Docker | Docker Desktop、または Docker Engine + Compose v2 |
-| Compose コマンド | `docker compose`（`docker-compose` ではない） |
-| 空きポート | デフォルト `8000`（`.env` で変更可能） |
-| OS | macOS / Linux / Windows（WSL2 推奨） |
+### 解決する課題
 
-セットアップ前に、次のコマンドが通ることを確認してください。
+- クレジットカード明細 CSV を取り込み、生活費対象の明細を整理する
+- 2 人の月収から負担割合を自動計算する
+- 「誰がいくら立て替えたか」と「本来負担すべき額」の差分から精算額を出す
+- 選択した明細について、収入比に基づく **家事按分同意書 PDF** を生成する
+
+### ドメインモデル
+
+- `MonthlyBudget`（月次予算）: 対象月 `year_month`、ユーザー A/B、各月収
+- `Transaction`（取引明細）: 日付・摘要・金額・生活費フラグ・支払者・カテゴリ
+
+
+## コアロジック
+
+収入比で生活費の**負担額**を出し、**立替過不足**を精算する。
+
+1. `ratio` = 各月収 / 合計収入（小数第 4 位）
+2. `share` = 生活費合計 × `ratio`（円・四捨五入）
+3. `settlement` = `paid_a` − `share_a`（正→B→A、負→A→B、0→不要）
+
+**例**（収入 30万:20万、生活費 3万円、A 立替 1.3万円）→ A は 1.8万円負担 → **A が B に 5,000 円**
+
+収入未入力・合計 0 は割合なし。支払者未設定は警告。金額は `Decimal` / `ROUND_HALF_UP`。
+
+| 順 | ファイル | 役割 |
+|----|----------|------|
+| 1 | `budgets/domain/ratios.py` | 割合・負担額 |
+| 2 | `budgets/services/settlement.py` | 合計・立替・精算 |
+| 3 | `tests/budgets/test_domain_ratios.py`, `test_settlement.py` | 検証 |
+
+同意書 PDF・CSV 取込は同じ按分ロジック / パース＋重複排除（`agreement.py`, `csv_import/`）。
+
+## アーキテクチャ
+
+`View` → `Service` → `domain/ratios.py`（計算） / ORM（明細集計）。CSV のみ Protocol → Adapter。
+
+- 計算は ORM 非依存
+- 精算と同意書で按分関数を共有
+- CSV はポート/アダプター分離
+
+## ディレクトリ構成
+
+`dualspendcalculator/` は Django アプリ本体です。機能ごとにフォルダが分かれています。
+
+| フォルダ | 役割（一言） |
+|----------|-------------|
+| `config/` | 設定・URL の入口（どの URL がどの画面につながるか） |
+| `common/` | 全アプリ共通の小さな道具（環境変数の読み取り、文字コード判定など） |
+| `budgets/` | **月と収入の管理・精算計算・同意書 PDF**（このアプリの中心） |
+| `transactions/` | **カード明細の表示・編集・一括操作**（生活費フラグ・支払者の付け替え） |
+| `csv_import/` | **クレジットカードデータ(CSV)の取込**（読み取り → 重複チェック → DB 保存） |
+| `static/` | 全画面共通の CSS とログイン画面などのベーステンプレート |
+
+### `budgets/` の中身
+
+| フォルダ / ファイル | 役割 |
+|--------------------|------|
+| `domain/` | 収入比・負担額の計算だけを書いた場所（DB に触れない純粋なロジック） |
+| `services/` | 精算・同意書 PDF など「やりたいこと」を実現する処理 |
+| `presenters/` | 画面に渡す数字・文言の組み立て |
+| `models.py` | 月次予算（`MonthlyBudget`）の定義 |
+| `views.py` / `forms.py` | 画面の表示・入力受付 |
+| `templates/` | ダッシュボード・月一覧・月詳細・同意書の HTML |
+| `static/budgets/js/` | 月詳細画面の Ajax 一括操作 |
+
+### `transactions/` の中身
+
+| フォルダ / ファイル | 役割 |
+|--------------------|------|
+| `models.py` | 取引明細（`Transaction`）の定義 |
+| `services/` | 明細の一括更新（生活費から外す・支払者を設定する） |
+| `presenters/` | 明細一覧ブロックの表示データ組み立て |
+| `templates/` | 明細編集画面・一覧の部分テンプレート |
+
+### `csv_import/` の中身
+
+| フォルダ / ファイル | 役割 |
+|--------------------|------|
+| `services/` | CSV の1行ずつの読み取りと取込処理 |
+| `ports.py` / `adapters.py` | 取込処理と DB のつなぎ方を分離（テストしやすくするため） |
+| `presenters/` | アップロード欄の表示データ組み立て |
+| `views.py` / `forms.py` | CSV アップロード画面 |
+
+**読む順の目安**: `budgets/domain/` → `budgets/services/` → `transactions/models.py` → `csv_import/services/`
+
+## 技術スタック
+
+| 層 | 技術 |
+|----|------|
+| 言語 / FW | Python 3.11, Django 5.x |
+| DB | PostgreSQL 16 |
+| PDF | WeasyPrint |
+| テスト | pytest, pytest-django |
+| インフラ | Docker Compose |
+| フロント | Django テンプレート + 素の JavaScript（Ajax 一括操作） |
+
+金額計算は `Decimal` を使用し、`float` は使いません。
+
+## テストの読み方
 
 ```bash
-docker --version
-docker compose version
+# Docker 内で全テスト実行
+docker compose exec web pytest
+
+# ドメインロジックのみ（計算の精査に最適）
+docker compose exec web pytest tests/budgets/test_domain_ratios.py tests/budgets/test_settlement.py -v
+
+# CSV パーサのみ
+docker compose exec web pytest tests/csv_import/ -v
 ```
 
-## クイックスタート（初回セットアップ）
+### テスト構成
 
-以下のコマンドは、すべて**リポジトリルート**（`DualSpendCalculator/`）で実行します。
+| ディレクトリ | 検証対象 |
+|-------------|----------|
+| `tests/budgets/` | 精算・按分・Presenter・View |
+| `tests/transactions/` | 一括操作・明細表示 |
+| `tests/csv_import/` | エポス CSV パーサ |
+| `tests/common/` | 環境変数ユーティリティ |
 
-### 1. リポジトリを取得
+### テスト設計の特徴
 
-```bash
-git clone <repository-url>
-cd DualSpendCalculator
-```
+- `conftest.py` で `user_a` / `user_b` / `monthly_budget` / `transaction` フィクスチャを共通化
+- 計算ロジックは Arrange-Act-Assert 形式で、docstring にテスト ID（T-xxx）を記載
+- 金額計算は `Decimal` を使用（`float` 不使用）
 
-### 2. 環境変数ファイルを作成
+## ローカル起動
+
+リポジトリルートで実行します。Docker と Compose v2 が必要です。
 
 ```bash
 cp .env.example .env
-```
-
-`.env` は git 管理外です。秘密情報やポート番号の変更は `.env` に記述します。
-
-`.env` は次の 2 用途で使われます。
-
-- Docker Compose の変数置換（`${HOST_WEB_PORT}` など）
-- `web` コンテナへの環境変数注入（`env_file`）
-
-### 3. コンテナをビルド・起動
-
-```bash
 docker compose up --build -d
-```
-
-**成功の目安**: `docker compose ps` で `web` と `db` の STATUS が `Up` になる。
-
-```bash
-docker compose ps
-```
-
-想定されるコンテナ名:
-
-| サービス | コンテナ名 |
-|----------|-----------|
-| Django（web） | `dualspendcalculator_web` |
-| PostgreSQL（db） | `dualspendcalculator_db` |
-
-### 4. DB マイグレーション（初回のみ）
-
-```bash
 docker compose exec web python manage.py migrate
-```
-
-**成功の目安**: `Applying ... OK` が表示される。
-
-### 5. 管理者ユーザーを作成（初回のみ）
-
-```bash
 docker compose exec web python manage.py createsuperuser
 ```
 
-対話形式でユーザー名・メールアドレス・パスワードを入力します。
-
-### 6. 動作確認
-
-ブラウザで次の URL を開きます。
-
-```
-http://localhost:8000/
-```
-
-**成功の目安**: ログイン画面が表示される。
-
-## 2 回目以降の起動
-
-```bash
-docker compose up -d
-```
-
-マイグレーションと管理者ユーザー作成は不要です。PostgreSQL のデータは Docker ボリューム `dualspendcalculator_postgres_data` に永続化されます。
-
-## 環境変数リファレンス
-
-`.env.example` をコピーした `.env` で設定します。
-
-| 変数名 | デフォルト | 用途 |
-|--------|-----------|------|
-| `HOST_WEB_PORT` | `8000` | ホスト側の公開ポート |
-| `DJANGO_SECRET_KEY` | `django-insecure-change-me` | Django 秘密鍵（本番では必ず変更） |
-| `DJANGO_DEBUG` | `1` | デバッグモード（`1` = 有効） |
-| `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1` | 許可ホスト（カンマ区切り） |
-| `POSTGRES_DB` | `dualspendcalculator` | DB 名（`db` コンテナの初期化に使用） |
-| `POSTGRES_USER` | `dualspendcalculator` | DB ユーザー |
-| `POSTGRES_PASSWORD` | `dualspendcalculator` | DB パスワード |
-| `DATABASE_URL` | `postgresql://dualspendcalculator:dualspendcalculator@db:5432/dualspendcalculator` | `web` コンテナの DB 接続先 |
-
-`DATABASE_URL` のホスト名は `db`（Compose のサービス名）です。`localhost` ではありません。
-
-## よく使うコマンド
-
-リポジトリルートで実行します。
-
-```bash
-# コンテナの状態確認
-docker compose ps
-
-# web コンテナのログ確認（直近 50 行）
-docker compose logs web --tail 50
-
-# db コンテナのログ確認（直近 50 行）
-docker compose logs db --tail 50
-
-# コンテナ停止（データは保持）
-docker compose down
-
-# コンテナ停止 + ボリューム削除（DB データも削除）
-docker compose down -v
-```
-
-`docker compose down -v` は DB データを完全に消去します。初回セットアップからやり直す場合にのみ使用してください。
-
-## トラブルシューティング
-
-### ポート 8000 が既に使われている
-
-`Bind for 0.0.0.0:8000 failed: port is already allocated` は、別のコンテナやプロセスがホストの 8000 番ポートを使用しているときに発生します。
-
-**対処 1**: 競合しているコンテナを停止する。
-
-```bash
-docker ps
-docker stop <コンテナ名>
-```
-
-**対処 2**: ホスト側ポートを変更して起動する。
-
-`.env` を編集:
-
-```
-HOST_WEB_PORT=8001
-```
-
-または、一時的に環境変数を指定:
-
-```bash
-HOST_WEB_PORT=8001 docker compose up --build -d
-```
-
-この場合、ブラウザでは `http://localhost:8001/` を開きます。
-
-### コンテナが起動しない
-
-```bash
-docker compose logs web
-docker compose logs db
-```
-
-`.env` がリポジトリルートに存在するか確認してください（`cp .env.example .env`）。
-
-### DB 接続エラー
-
-1. `docker compose ps` で `db` が `Up` であることを確認する。
-2. `.env` の `DATABASE_URL` と `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` が整合していることを確認する。
-
-### ログイン画面は出るが操作でエラーになる
-
-マイグレーション未実行の可能性があります。
-
-```bash
-docker compose exec web python manage.py migrate
-```
-
-### 管理者ユーザーでログインできない
-
-`createsuperuser` が未実行、または別ユーザーで作成した可能性があります。
-
-```bash
-docker compose exec web python manage.py createsuperuser
-```
+ブラウザで `http://localhost:8000/` を開き、ログイン画面が表示されれば起動完了です。
