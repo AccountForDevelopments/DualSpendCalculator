@@ -1,0 +1,853 @@
+---
+description: "命名規則の詳細ガイド。言語別の具体例、項目別命名規則、略語ガイドライン。naming_summary.mdc で判断できない場合に参照。"
+alwaysApply: false
+---
+# 命名規則ガイド
+
+このドキュメントは、プロジェクトにおける命名規則の詳細を定義します。  
+クイックリファレンスは [`naming_summary.mdc`](./naming_summary.mdc) を参照してください。
+
+## 言語別命名規則の原則
+
+本プロジェクトでは、**各言語の業界標準に従う**ことを基本とする。
+
+| 言語 | 変数・関数 | 定数 | クラス | 根拠 |
+|------|-----------|------|--------|------|
+| Python | snake_case | UPPER_SNAKE_CASE | PascalCase | PEP 8 |
+| JavaScript | camelCase | UPPER_SNAKE_CASE | PascalCase | ESLint / MDN |
+| CSS | — | — | kebab-case | BEM / W3C |
+| Shell | snake_case | UPPER_SNAKE_CASE | — | POSIX慣習 |
+
+**理由**:
+- 外部ライブラリ・フレームワークとの整合性
+- ツール（ESLint、Prettier等）のデフォルト設定との互換性
+- 新規メンバーの学習コスト削減
+
+---
+
+## 命名の基本原則
+
+### 1. 明確性を最優先
+- **意図が伝わる名前**を選ぶ（短さより明確さ）
+- **文脈に依存しない**名前にする
+- **省略は慎重に**（一般的な略語のみ使用）
+
+### 2. 一貫性を保つ
+- プロジェクト全体で同じルールを適用
+- 既存コードの命名パターンを踏襲
+- ケースルール（snake_case等）を厳守
+
+### 3. 検索可能な名前
+- 単一文字の変数は避ける（ループ変数の `i`, `j` は例外）
+- 一般的すぎる単語（`data`, `info`, `tmp`）は避ける
+
+---
+
+## 項目別命名規則
+
+### 1. Djangoアプリ名（apps/配下）
+
+**ケース**: スネークケース（小文字）  
+**意図**: アプリの責務を簡潔に表現。複数単語の場合は明確に区切る。  
+**長さ**: 1〜2単語が理想（長すぎる場合は責務が大きすぎる可能性）
+
+```python
+# ✅ Good: 責務が明確
+apps/user_auth/          # ユーザー認証
+apps/blog/               # ブログ機能
+apps/payment_gateway/    # 決済ゲートウェイ
+
+# ❌ Bad: キャメルケース、曖昧
+apps/UserAuth/           # 大文字不可
+apps/module1/            # 責務不明
+```
+
+**命名パターン**:
+- 機能名: `blog`, `search`, `contact`
+- 機能＋役割: `user_auth`, `payment_gateway`, `email_service`
+
+---
+
+### 2. モジュール名（Pythonファイル）
+
+**ケース**: スネークケース（小文字）  
+**意図**: ファイルの役割を明示。Djangoの慣習に従う。  
+**避けるべき**: 一般的すぎる名前（`utils.py`, `helpers.py`だけでは不十分）
+
+```python
+# ✅ Good: 役割が明確
+user_serializers.py      # ユーザー用シリアライザー
+email_service.py         # メール送信サービス
+blog_validators.py       # ブログ用バリデーション
+
+# ❌ Bad: 曖昧
+utils.py                 # 何のユーティリティ？
+helpers.py               # 何を助ける？
+```
+
+**推奨パターン**:
+- `models.py`, `views.py`, `forms.py` （Django標準）
+- `{機能名}_service.py` （サービス層）
+- `{機能名}_utils.py` （特定機能のユーティリティ）
+
+---
+
+### 3. パッケージ名（サブディレクトリ）
+
+**ケース**: スネークケース（小文字）  
+**意図**: モジュールの集合を論理的にグループ化
+
+```python
+# ✅ Good: 論理的なグループ化
+apps/blog/
+    ├── models/
+    │   ├── __init__.py
+    │   ├── blog_post.py
+    │   └── category.py
+    ├── services/
+    └── validators/
+
+# ❌ Bad: 不明確
+apps/blog/
+    ├── stuff/           # 何が入っている？
+    └── misc/            # その他では分類になっていない
+```
+
+---
+
+### 4. 定数名
+
+**ケース**: アッパースネークケース（全て大文字）  
+**意図**: 「変わらない性質」を明示。設定値や固定値に使用。  
+**配置**: ファイルの先頭、もしくは `constants.py`
+
+```python
+# ✅ Good: 不変性と意味が明確
+MAX_LOGIN_ATTEMPTS = 5
+DEFAULT_PAGE_SIZE = 20
+API_TIMEOUT_SECONDS = 30
+ALLOWED_IMAGE_FORMATS = ['jpg', 'png', 'gif']
+
+# ❌ Bad: 小文字、曖昧
+max_attempts = 5         # 定数に見えない
+LIMIT = 20               # 何の制限？
+```
+
+**命名パターン**:
+- `MAX_{対象}` （上限値）
+- `MIN_{対象}` （下限値）
+- `DEFAULT_{対象}` （デフォルト値）
+- `{対象}_TIMEOUT` （タイムアウト）
+- `ALLOWED_{対象}` （許可リスト）
+
+---
+
+### 5. 変数名
+
+**ケース**: スネークケース（小文字）  
+**意図**: 「データの意味」と「用途」を組み合わせる。曖昧な `data`, `info`, `result` は避ける。  
+**スコープ**: 長い変数名はローカルスコープ、短い変数名はループのみ
+
+```python
+# ✅ Good: 意味と用途が明確
+published_blog_posts = BlogPost.objects.filter(status='published')
+user_email_address = request.POST.get('email')
+total_order_amount = sum(item.price for item in cart_items)
+
+# ❌ Bad: 曖昧、意味不明
+data = BlogPost.objects.all()           # 何のデータ？
+info = request.POST.get('email')        # 何の情報？
+x = sum(item.price for item in items)   # 何を表す？
+```
+
+**命名パターン**:
+- `{形容詞}_{名詞}`: `active_users`, `published_posts`
+- `{名詞}_{属性}`: `user_email`, `post_title`
+- `is_{状態}`: `is_authenticated`, `is_valid` （真偽値）
+- `has_{属性}`: `has_permission`, `has_errors` （真偽値）
+- `{名詞}_count`: `comment_count`, `page_count` （カウント）
+- `{名詞}_list`: `user_list`, `error_list` （リスト）
+
+---
+
+### 6. 関数名
+
+**ケース**: スネークケース（小文字）  
+**意図**: 「行動（動詞） ＋ 対象（名詞）」で表す。処理の目的を端的に。  
+**避けるべき**: `do_`, `handle_`, `process_` のような曖昧な動詞のみ
+
+```python
+# ✅ Good: 動詞＋対象で明確
+def calculate_total_price(items):
+    """商品の合計金額を計算"""
+    pass
+
+def send_welcome_email(user):
+    """ウェルカムメールを送信"""
+    pass
+
+def validate_email_format(email):
+    """メールアドレスの形式を検証"""
+    pass
+
+# ❌ Bad: 曖昧、動詞なし
+def process_data(items):        # 何を処理？
+    pass
+
+def email(user):                # 動詞がない
+    pass
+
+def check(value):               # 何をチェック？
+    pass
+```
+
+**推奨動詞パターン**:
+- **取得**: `get_`, `fetch_`, `find_`
+- **作成**: `create_`, `build_`, `generate_`
+- **更新**: `update_`, `set_`
+- **削除**: `delete_`, `remove_`, `clear_`
+- **検証**: `validate_`, `verify_`
+- **変換**: `convert_`, `format_`, `parse_`
+- **計算**: `calculate_`
+- **送信**: `send_`
+- **判定**: `is_`, `has_`, `can_`（真偽値を返す）
+
+> **⚠️ 使用しない動詞**
+> - `make`, `do`, `process`, `handle`, `manage` — 曖昧なため、具体的な動詞を選択すること
+> - `retrieve` — `get` または `fetch` で代替
+> - `modify`, `change` — `update` で統一
+
+---
+
+### 7. クラス名
+
+**ケース**: パスカルケース（各単語の頭文字を大文字）  
+**意図**: 「モノ（名詞）」を表す。役割や責務を明確に。  
+**避けるべき**: `Manager`, `Helper`, `Utility` のような曖昧な接尾辞のみ
+
+```python
+# ✅ Good: 責務が明確
+class UserAuthenticationService:
+    """ユーザー認証サービス"""
+    pass
+
+class BlogPostSerializer:
+    """ブログ投稿のシリアライザー"""
+    pass
+
+class PaymentGateway:
+    """決済ゲートウェイ"""
+    pass
+
+# ❌ Bad: 曖昧、責務不明
+class Manager:              # 何を管理？
+    pass
+
+class Helper:               # 何を助ける？
+    pass
+
+class Utils:                # ユーティリティの集まり（クラスではない）
+    pass
+```
+
+**命名パターン**:
+- モデル: `User`, `BlogPost`, `Order` （単数形の名詞）
+- サービス: `{機能}Service` （`EmailService`, `PaymentService`）
+- シリアライザー: `{モデル}Serializer`
+- フォーム: `{モデル}Form`, `{目的}Form`
+- ビュー: `{モデル}{動作}View` （`BlogPostListView`）
+
+---
+
+### 8. Djangoモデルクラス
+
+**ケース**: パスカルケース（各単語の頭文字を大文字）、**単数形**  
+**意図**: データベースのテーブルを表す。1つのエンティティを表現。
+
+```python
+# ✅ Good: パスカルケース、単数形
+class BlogPost(models.Model):
+    title = models.CharField(max_length=200)
+    pass
+
+class UserProfile(models.Model):
+    pass
+
+# ❌ Bad: 複数形やスネークケース
+class blog_posts(models.Model):  # 誤: スネークケース
+    pass
+
+class BlogPosts(models.Model):   # 誤: 複数形
+    pass
+```
+
+---
+
+### 9. Wagtailページモデル
+
+**ケース**: パスカルケース、**必ず "Page" で終わる**  
+**意図**: Wagtailのページ階層を表す。テンプレート自動検索に対応。
+
+```python
+# ✅ Good: 必ず "Page" で終わる
+class HomePage(Page):
+    pass
+
+class BlogIndexPage(Page):
+    pass
+
+class BlogDetailPage(Page):
+    pass
+
+# ❌ Bad: Page で終わらない
+class Blog(Page):  # 誤: Pageで終わらない
+    pass
+```
+
+**テンプレート名の対応**:
+- `HomePage` → `home_page.html`
+- `BlogIndexPage` → `blog_index_page.html`
+- `BlogDetailPage` → `blog_detail_page.html`
+
+---
+
+### 10. メソッド名
+
+**ケース**: スネークケース（小文字）  
+**意図**: インスタンスに対する「行動」を表す。関数と同じく動詞＋対象。  
+**特殊**: プライベートメソッドは `_` で開始
+
+```python
+# ✅ Good: 行動が明確
+class BlogPost:
+    def publish(self):
+        """記事を公開する"""
+        pass
+    
+    def update_publish_date(self):
+        """公開日時を更新"""
+        pass
+    
+    def _validate_content(self):
+        """コンテンツを検証（内部用）"""
+        pass
+
+# ❌ Bad: 曖昧
+class BlogPost:
+    def do_something(self):     # 何をする？
+        pass
+    
+    def process(self):          # 何を処理？
+        pass
+```
+
+**パターン**:
+- 通常メソッド: `関数名` と同じルール
+- プロパティ: `@property` で動詞なし（`user.email`、`post.title`）
+- プライベート: `_internal_method()`
+- マジックメソッド: `__str__()`, `__repr__()` （Pythonの慣習）
+
+---
+
+### 11. 引数名
+
+**ケース**: スネークケース（小文字）  
+**意図**: 引数の役割を明確に。型が推測できる名前にする。
+
+```python
+# ✅ Good: 役割が明確
+def send_email(recipient_email: str, subject: str, body: str):
+    pass
+
+def create_blog_post(title: str, content: str, author: User):
+    pass
+
+# ❌ Bad: 曖昧、型が不明
+def send_email(to, s, b):
+    pass
+
+def create_blog_post(a, b, c):
+    pass
+```
+
+**パターン**:
+- リスト: `{名詞}_list`, `{名詞}s` （`user_list` or `users`）
+- 辞書: `{名詞}_dict`, `{名詞}_map`
+- ID: `{モデル}_id` （`user_id`, `post_id`）
+- フラグ: `is_{状態}`, `should_{動作}` （`is_active`, `should_send`）
+
+---
+
+### 12. モデルフィールド名
+
+**ケース**: スネークケース（小文字）  
+**意図**: データベースのカラム名と対応。意味が明確で検索しやすい。  
+**避けるべき**: Pythonの予約語、Djangoの予約語（`class`, `type` 等）
+
+```python
+# ✅ Good: 意味が明確
+class BlogPost(models.Model):
+    title = models.CharField(max_length=200)
+    content = models.TextField()
+    published_at = models.DateTimeField(null=True)
+    author = models.ForeignKey(User, on_delete=models.CASCADE)
+    is_published = models.BooleanField(default=False)
+    view_count = models.IntegerField(default=0)
+
+# ❌ Bad: 曖昧、予約語
+class BlogPost(models.Model):
+    name = models.CharField(max_length=200)     # タイトル？著者名？
+    text = models.TextField()                   # content の方が明確
+    date = models.DateTimeField()               # 作成日？公開日？
+    type = models.CharField()                   # Python予約語
+```
+
+**パターン**:
+- 日時: `{動作}_at` （`created_at`, `published_at`, `updated_at`）
+- 真偽値: `is_{状態}`, `has_{属性}` （`is_active`, `has_image`）
+- カウント: `{名詞}_count` （`view_count`, `like_count`）
+- 外部キー: `{モデル名（単数）}` （`author`, `category`）
+- 多対多: `{モデル名（複数）}` （`tags`, `categories`）
+
+---
+
+### 13. ビュー関数
+
+**ケース**: スネークケース（小文字）  
+**意図**: HTTPリクエストを処理する関数。動作を明確に。
+
+```python
+# ✅ Good: スネークケース
+def blog_list(request):
+    pass
+
+def user_profile_detail(request):
+    pass
+
+# ❌ Bad: キャメルケース
+def blogList(request):  # 誤
+    pass
+```
+
+---
+
+### 14. クラスベースビュー
+
+**ケース**: パスカルケース（各単語の頭文字を大文字）  
+**意図**: Djangoのクラスベースビュー。`{モデル}{動作}View` のパターン。
+
+```python
+# ✅ Good: パスカルケース
+class BlogListView(ListView):
+    pass
+
+class UserProfileDetailView(DetailView):
+    pass
+
+# ❌ Bad: スネークケース
+class blog_list_view(ListView):  # 誤
+    pass
+```
+
+---
+
+### 15. URL名（name引数）
+
+**ケース**: スネークケース（小文字）  
+**意図**: テンプレートで `{% url 'name' %}` として参照しやすく。
+
+```python
+# ✅ Good: 階層が明確
+urlpatterns = [
+    path('blog/', views.blog_list, name='blog_list'),
+    path('blog/<int:pk>/', views.blog_detail, name='blog_detail'),
+    path('blog/create/', views.blog_create, name='blog_create'),
+    path('user/profile/', views.user_profile, name='user_profile'),
+]
+
+# ❌ Bad: 曖昧、一貫性なし
+urlpatterns = [
+    path('blog/', views.blog_list, name='list'),         # 何のリスト？
+    path('blog/<int:pk>/', views.blog_detail, name='blogDetail'),  # ケース不統一
+]
+```
+
+**パターン**: `{アプリ名}_{動作}` or `{モデル名}_{動作}`
+
+---
+
+### 16. URLパス
+
+**ケース**: ケバブケース（ハイフン区切り、小文字）  
+**意図**: SEOとWeb標準に準拠。読みやすく、検索エンジンに優しい。  
+**避けるべき**: アンダースコア、キャメルケース
+
+```python
+# ✅ Good: ケバブケース
+path('user-profile/', ...)
+path('blog/published-posts/', ...)
+path('order-history/', ...)
+
+# ❌ Bad: アンダースコア、キャメルケース
+path('user_profile/', ...)        # SEO非推奨
+path('userProfile/', ...)         # Web標準外
+path('BLOG/POSTS/', ...)          # 大文字不要
+```
+
+---
+
+### 17. テンプレート名
+
+**ケース**: スネークケース（小文字）  
+**意図**: Pythonのファイル名規則と統一。Wagtailの自動検索に対応。
+
+```
+# ✅ Good: スネークケース
+templates/
+├── base.html
+├── blog/
+│   ├── blog_list.html
+│   ├── blog_detail.html
+│   └── blog_post_form.html
+└── user/
+    └── user_profile.html
+
+# ❌ Bad: キャメルケース
+templates/
+├── blogList.html              # Python規則と不一致
+└── userProfile.html           # 検索しづらい
+```
+
+**Wagtailページモデル**: クラス名をスネークケースに変換
+- `HomePage` → `home_page.html`
+- `BlogIndexPage` → `blog_index_page.html`
+
+---
+
+### 18. 静的ファイル名
+
+**ケース**: スネークケース（小文字）  
+**意図**: ファイルシステムとの整合性。検索しやすく。
+
+```
+# ✅ Good: スネークケース
+static/
+├── css/
+│   ├── base.css
+│   └── user_profile.css
+├── js/
+│   ├── main.js
+│   └── form_validation.js
+└── images/
+    └── logo_header.png
+
+# ❌ Bad: キャメルケース
+static/
+├── css/userProfile.css        # ケース不統一
+└── js/formValidation.js       # ケース不統一
+```
+
+---
+
+### 19. 設定ファイル（settings.py）
+
+**ケース**: アッパースネークケース（全て大文字）  
+**意図**: Djangoの慣習に従う。設定値は定数として扱う。
+
+```python
+# ✅ Good: 大文字（Django慣習）
+DEBUG = True
+SECRET_KEY = "xxx"
+INSTALLED_APPS = [...]
+ALLOWED_HOSTS = [...]
+
+# カスタム設定
+MAX_UPLOAD_SIZE = 5 * 1024 * 1024
+DEFAULT_PAGINATION = 20
+
+# ❌ Bad: 小文字
+debug = True              # Django慣習に反する
+secret_key = "xxx"        # Django慣習に反する
+```
+
+---
+
+### 20. 環境変数（.env）
+
+**ケース**: アッパースネークケース（全て大文字）  
+**意図**: 環境設定を明確に識別。OSの環境変数と統一。
+
+```bash
+# ✅ Good: アッパースネークケース
+DEBUG=1
+SECRET_KEY=changeme
+DATABASE_URL=postgresql://...
+ALLOWED_HOSTS=*
+MAX_UPLOAD_SIZE=5242880
+
+# ❌ Bad: 小文字やキャメルケース
+debug=1              # 誤
+secretKey=changeme   # 誤
+```
+
+---
+
+### 21. シェルスクリプト
+
+**ケース**: スネークケース（小文字）  
+**拡張子**: `.sh` を明示  
+**意図**: Pythonファイルと統一。動詞＋対象で処理内容を明確に。  
+**例外**: Docker/業界標準の名前（`docker-entrypoint.sh` 等）はそのまま使用
+
+```bash
+# ✅ Good: スネークケース、意図が明確
+scripts/setup_env.sh          # 環境セットアップ
+scripts/run_tests.sh          # テスト実行
+scripts/deploy_staging.sh     # ステージング環境デプロイ
+scripts/backup_database.sh    # データベースバックアップ
+scripts/generate_secrets.sh   # シークレット生成
+scripts/cleanup_logs.sh       # ログクリーンアップ
+
+# ✅ Good: Docker標準（例外として許可）
+docker-entrypoint.sh          # Dockerコンテナエントリーポイント
+docker-compose.yml            # Docker Compose設定
+docker-compose.override.yml   # Docker Compose上書き設定
+
+# ❌ Bad: ケバブケース（Docker標準以外）
+scripts/setup-env.sh          # スネークケースに統一すべき
+scripts/deploy-staging.sh     # スネークケースに統一すべき
+
+# ❌ Bad: キャメルケース
+scripts/runTests.sh           # スネークケース不可
+scripts/deployStaging.sh      # スネークケース不可
+
+# ❌ Bad: 曖昧
+scripts/script.sh             # 何をするスクリプト？
+scripts/run.sh                # 何を実行？
+scripts/utils.sh              # 何のユーティリティ？
+```
+
+**命名パターン**:
+- セットアップ: `setup_{対象}.sh` （`setup_database.sh`, `setup_redis.sh`）
+- 実行: `run_{対象}.sh` （`run_server.sh`, `run_tests.sh`, `run_migrations.sh`）
+- デプロイ: `deploy_{環境}.sh` （`deploy_production.sh`, `deploy_staging.sh`）
+- バックアップ: `backup_{対象}.sh` （`backup_database.sh`, `backup_media.sh`）
+- 生成: `generate_{対象}.sh` （`generate_secrets.sh`, `generate_ssl_cert.sh`）
+- クリーンアップ: `cleanup_{対象}.sh` （`cleanup_logs.sh`, `cleanup_cache.sh`）
+- チェック: `check_{対象}.sh` （`check_dependencies.sh`, `check_health.sh`）
+
+**スクリプト内部の命名規則**:
+
+```bash
+#!/bin/bash
+set -e
+
+# ✅ Good: 定数は UPPER_SNAKE_CASE
+readonly MAX_RETRIES=3
+readonly TIMEOUT_SECONDS=30
+readonly DEFAULT_PORT=8000
+readonly LOG_FILE="/var/log/app.log"
+
+# ✅ Good: 変数は snake_case
+database_name="ontiptoe_db"
+backup_directory="/tmp/backups"
+timestamp=$(date +%Y%m%d_%H%M%S)
+user_input=""
+
+# ✅ Good: 関数は snake_case、動詞で開始
+setup_database() {
+    echo "Setting up database..."
+    # 処理
+}
+
+check_dependencies() {
+    echo "Checking dependencies..."
+    # 処理
+}
+
+validate_environment_variables() {
+    if [ -z "$DATABASE_URL" ]; then
+        echo "ERROR: DATABASE_URL is not set"
+        exit 1
+    fi
+}
+
+# ❌ Bad: キャメルケース
+setupDatabase() {  # 誤
+    pass
+}
+
+# ❌ Bad: 曖昧な関数名
+do_something() {   # 何をする？
+    pass
+}
+```
+
+**Docker標準ファイル例外**:
+
+以下のファイルはDocker/業界の事実上の標準名として、kebab-caseのまま使用を許可：
+- `docker-entrypoint.sh`
+- `docker-compose.yml`
+- `docker-compose.override.yml`
+- `docker-compose.prod.yml`
+
+**理由**:
+1. Docker公式ドキュメントで推奨されている標準名
+2. 多くのツール・ライブラリがこれらの名前を期待
+3. 検索性・参考資料の豊富さ
+
+---
+
+### 22. JavaScript
+
+**原則**: 業界標準（MDN / ESLint推奨）に従う
+
+| 対象 | ケース | 例 |
+|------|--------|-----|
+| 変数 | camelCase | `userName`, `modalId` |
+| 関数 | camelCase | `openModal()`, `calculateTotal()` |
+| 定数 | UPPER_SNAKE_CASE | `MAX_RETRIES`, `API_TIMEOUT` |
+| クラス | PascalCase | `UserService`, `ModalManager` |
+
+```javascript
+// ✅ Good: 業界標準に準拠
+const overlaySelector = ".modal-overlay";
+const activeClass = "is-active";
+
+const openModal = (id) => {
+  const overlay = findOverlay(id);
+  overlay.classList.add(activeClass);
+};
+
+// ❌ Bad: snake_case（Pythonの規則をJSに適用）
+const overlay_selector = ".modal-overlay";
+const open_modal = (id) => { /* ... */ };
+```
+
+---
+
+### 23. CSS
+
+**原則**: BEM / W3C標準に従い、kebab-caseを使用
+
+| 対象 | ケース | 例 |
+|------|--------|-----|
+| クラス名 | kebab-case | `.modal-overlay`, `.user-profile` |
+| 状態クラス | kebab-case | `.is-active`, `.has-error` |
+| CSS変数 | kebab-case | `--color-primary`, `--font-sans` |
+
+```css
+/* ✅ Good: kebab-case（業界標準） */
+.modal-overlay { /* ... */ }
+.modal-dialog { /* ... */ }
+.is-active { /* ... */ }
+
+/* ❌ Bad: snake_case */
+.modal_overlay { /* ... */ }
+.is_active { /* ... */ }
+```
+
+---
+
+## 状況別ベストプラクティス
+
+### ループ変数
+
+```python
+# ✅ Good: 意味のある名前（外側のスコープ）
+for blog_post in published_posts:
+    process(blog_post)
+
+# ✅ Good: 短い名前OK（シンプルなループ）
+for i in range(10):
+    print(i)
+
+# ❌ Bad: 単一文字（複雑なロジック）
+for p in posts:
+    for c in p.comments:
+        for t in c.tags:  # 3重ループで p, c, t は読みづらい
+            process(t)
+```
+
+### 一時変数
+
+```python
+# ✅ Good: 明確な一時変数
+filtered_users = [u for u in users if u.is_active]
+sorted_users = sorted(filtered_users, key=lambda u: u.created_at)
+
+# ❌ Bad: 曖昧な一時変数
+temp = [u for u in users if u.is_active]
+result = sorted(temp, key=lambda u: u.created_at)  # temp, result では意味不明
+```
+
+### プライベート変数/メソッド
+
+```python
+# ✅ Good: アンダースコアで内部実装を明示
+class UserService:
+    def __init__(self):
+        self._cache = {}  # 内部キャッシュ
+    
+    def get_user(self, user_id):
+        return self._fetch_from_cache(user_id)
+    
+    def _fetch_from_cache(self, user_id):  # 内部メソッド
+        return self._cache.get(user_id)
+```
+
+---
+
+## 略語の使用ガイドライン
+
+### 使用OK（一般的な略語）
+
+| 略語 | 正式名 | 使用例 |
+|------|--------|--------|
+| `id` | identifier | `user_id`, `post_id` |
+| `url` | Uniform Resource Locator | `api_url`, `redirect_url` |
+| `api` | Application Programming Interface | `api_key`, `api_client` |
+| `auth` | authentication | `user_auth`, `auth_token` |
+| `config` | configuration | `app_config` |
+| `db` | database | `db_connection` |
+| `num` | number | `num_items` |
+| `max` | maximum | `max_length` |
+| `min` | minimum | `min_value` |
+
+### 避けるべき（プロジェクト固有/不明瞭）
+
+```python
+# ❌ Bad: 意味不明な略語
+usr = get_user()        # user と書く
+msg = create_message()  # message と書く
+btn = Button()          # button と書く
+```
+
+**原則**: チーム全員が即座に理解できる略語のみ使用
+
+---
+
+## 命名チェックリスト
+
+コードレビュー時に確認：
+
+- [ ] **明確性**: 名前から意図が伝わるか？
+- [ ] **一貫性**: プロジェクトの命名規則に従っているか？
+- [ ] **検索性**: ファイル内で検索しやすいか？
+- [ ] **長さ**: スコープに応じた適切な長さか？
+- [ ] **省略**: 使用している略語は一般的か？
+- [ ] **曖昧さ**: `data`, `info`, `tmp` のような曖昧な名前を使っていないか？
+- [ ] **動詞**: 関数/メソッドは動詞で始まっているか？
+- [ ] **名詞**: クラス/変数は名詞になっているか？
+
+---
+
+## 参考：Python公式命名ガイド（PEP 8）
+
+本プロジェクトは [PEP 8](https://pep8.org/) に準拠します。
+
+**重要な原則**:
+- モジュール名: 短く、全て小文字、アンダースコア可
+- クラス名: パスカルケース（CapWords）
+- 関数名/変数名: スネークケース（lowercase_with_underscores）
+- 定数名: 全て大文字（ALL_CAPS_WITH_UNDERSCORES）

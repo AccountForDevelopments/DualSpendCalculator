@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}明細編集 - {{ transaction.description }} - 生活費精算{% endblock %}
+
+{% block content %}
+<div class="page-container page-container--narrow">
+    <div class="page-header">
+        <div class="page-header-content">
+            <h1 class="page-title">✏️ 明細編集</h1>
+            <p class="page-subtitle">{{ month.year_month }} の明細を編集</p>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- 明細情報（読み取り専用） -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-icon">📄</span>
+            <h2 class="card-title">明細情報</h2>
+        </div>
+        <div class="card-body">
+            <div class="readonly-info">
+                <div class="info-row">
+                    <span class="info-label">日付</span>
+                    <span class="info-value">{{ transaction.date }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">摘要</span>
+                    <span class="info-value">{{ transaction.description }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">金額</span>
+                    <span class="info-value info-value--amount">¥{{ transaction.amount|intcomma }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 編集フォーム -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-icon">⚙️</span>
+            <h2 class="card-title">設定</h2>
+        </div>
+        <div class="card-body">
+            <form method="post" class="edit-form" id="edit-form">
+                {% csrf_token %}
+                
+                <div class="form-group form-group--checkbox">
+                    <label class="checkbox-label">
+                        {{ form.is_living_cost }}
+                        <span class="checkbox-text">生活費に含める</span>
+                    </label>
+                    <p class="form-help">チェックすると精算対象になります</p>
+                </div>
+                
+                <div class="form-group">
+                    <label for="id_payer" class="form-label">支払者</label>
+                    {{ form.payer }}
+                    <p class="form-help">この明細を支払った人を選択</p>
+                </div>
+                
+                <div class="form-group">
+                    <label for="id_category" class="form-label">カテゴリ</label>
+                    {{ form.category }}
+                </div>
+                
+                <div class="form-group">
+                    <label for="id_memo" class="form-label">メモ</label>
+                    {{ form.memo }}
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">保存する</button>
+                    <a href="{% url 'budgets:month_detail' month.pk %}" class="btn btn-outline">キャンセル</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="page-nav">
+        <a href="{% url 'budgets:month_detail' month.pk %}" class="btn btn-outline">
+            ← 明細一覧に戻る
+        </a>
+    </div>
+</div>
+
+{% endblock %}
+

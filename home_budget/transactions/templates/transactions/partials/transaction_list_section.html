@@ -1,0 +1,165 @@
+{% load humanize %}
+<!-- フィルタフォーム -->
+<div class="card filter-card">
+    <div class="card-header">
+        <span class="card-icon">🔍</span>
+        <h2 class="card-title">フィルタ</h2>
+    </div>
+    <div class="card-body">
+        <form method="get" class="filter-form">
+            <div class="filter-grid">
+                <div class="filter-item">
+                    <label class="form-label">{{ filter_form.is_living_cost.label }}</label>
+                    {{ filter_form.is_living_cost }}
+                </div>
+                <div class="filter-item">
+                    <label class="form-label">{{ filter_form.payer.label }}</label>
+                    {{ filter_form.payer }}
+                </div>
+                <div class="filter-item">
+                    <label class="form-label">{{ filter_form.category.label }}</label>
+                    {{ filter_form.category }}
+                </div>
+                <div class="filter-item">
+                    <label class="form-label">{{ filter_form.amount_min.label }}</label>
+                    {{ filter_form.amount_min }}
+                </div>
+                <div class="filter-item">
+                    <label class="form-label">{{ filter_form.amount_max.label }}</label>
+                    {{ filter_form.amount_max }}
+                </div>
+                <div class="filter-item filter-actions">
+                    <button type="submit" class="btn btn-primary btn-sm">絞り込む</button>
+                    <a href="{% url 'budgets:month_detail' month.pk %}" class="btn btn-outline btn-sm">クリア</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 一括操作 & 明細一覧 -->
+<div class="card">
+    <div class="card-header">
+        <span class="card-icon">📝</span>
+        <h2 class="card-title">明細 ({{ page_obj.paginator.count }}件)</h2>
+    </div>
+    <div class="card-body">
+        {% if transactions %}
+        <form method="post" action="{% url 'transactions:bulk_action' month.pk %}" id="bulk-form">
+            {% csrf_token %}
+            <input type="hidden" name="filter_params" value="{{ filter_params }}">
+            
+            <!-- 一括操作ボタン -->
+            <div class="bulk-actions">
+                <div class="bulk-buttons">
+                    <button type="submit" name="action" value="include" class="btn btn-success btn-sm">
+                        ✅ 生活費に含める
+                    </button>
+                    <button type="submit" name="action" value="exclude" class="btn btn-outline btn-sm">
+                        ❌ 生活費から除外
+                    </button>
+                    <button type="submit" name="action" value="payer_a" class="btn btn-info btn-sm">
+                        👤 {{ month.user_a.username }}が支払い
+                    </button>
+                    <button type="submit" name="action" value="payer_b" class="btn btn-info btn-sm">
+                        👤 {{ month.user_b.username }}が支払い
+                    </button>
+                    <span class="bulk-btn-separator">|</span>
+                    <button type="button"
+                            id="btn-agreement"
+                            class="btn btn-warning btn-sm"
+                            disabled
+                            title="1件以上選択してください"
+                            data-agreement-url="{% url 'budgets:agreement_download' %}"
+                            data-month-id="{{ month.pk }}">
+                        📄 同意書を作成
+                    </button>
+                </div>
+                <div class="bulk-info">
+                    <span class="selected-count">0件選択中</span>
+                </div>
+            </div>
+
+            <!-- 明細テーブル -->
+            <div class="table-responsive">
+                <table class="data-table transaction-table">
+                    <thead>
+                        <tr>
+                            <th class="cell-checkbox">
+                                <input type="checkbox" class="select-all" id="select-all">
+                            </th>
+                            <th>日付</th>
+                            <th>摘要</th>
+                            <th class="text-right">金額</th>
+                            <th>生活費</th>
+                            <th>支払者</th>
+                            <th>カテゴリ</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tx in transactions %}
+                        <tr class="{% if tx.is_living_cost %}row-living-cost{% endif %}" data-tx-id="{{ tx.id }}">
+                            <td class="cell-checkbox">
+                                <input type="checkbox" name="selected" value="{{ tx.id }}" class="select-row">
+                            </td>
+                            <td>{{ tx.date|date:"m/d" }}</td>
+                            <td class="cell-truncate" title="{{ tx.description }}">{{ tx.description }}</td>
+                            <td class="text-right cell-amount">¥{{ tx.amount|intcomma }}</td>
+                            <td>
+                                {% if tx.is_living_cost %}
+                                <span class="badge badge-success">対象</span>
+                                {% else %}
+                                <span class="badge badge-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if tx.payer %}
+                                <span class="badge badge-payer">{{ tx.payer.username }}</span>
+                                {% else %}
+                                <span class="badge badge-warning">未設定</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if tx.category %}
+                                <span class="badge badge-category">{{ tx.get_category_display }}</span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="cell-actions">
+                                <a href="{% url 'transactions:transaction_edit' month.pk tx.pk %}" class="btn btn-sm btn-outline">
+                                    編集
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </form>
+
+        <!-- ページネーション -->
+        {% if page_obj.has_other_pages %}
+        <div class="pagination">
+            {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}{% if filter_params %}&{{ filter_params }}{% endif %}" class="btn btn-sm btn-outline">← 前へ</a>
+            {% endif %}
+            
+            <span class="pagination-info">
+                {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} ページ
+            </span>
+            
+            {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}{% if filter_params %}&{{ filter_params }}{% endif %}" class="btn btn-sm btn-outline">次へ →</a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% else %}
+        <div class="empty-state empty-state--small">
+            <p>条件に一致する明細がありません。</p>
+        </div>
+        {% endif %}
+    </div>
+</div>

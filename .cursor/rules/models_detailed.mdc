@@ -1,0 +1,357 @@
+---
+description: "Django Model層の実装テンプレート。QuerySet・Model（マスタ/実体）の具体的なコード例。models_summary.mdc のルールに基づく実装時に参照。"
+alwaysApply: false
+---
+
+# Django Model層 実装テンプレート
+
+> **ルール・方針**: [`models_summary.mdc`](./models_summary.mdc) を参照
+
+---
+
+## 【Part 0】ファイル構成の全体像
+
+```python
+# apps/materials/models.py
+"""
+ファイル内の記述順序:
+1. import 文
+2. Choices (Enum) クラス
+3. QuerySet クラス
+4. Model クラス
+"""
+
+import uuid
+from django.db import models
+from django.db.models import Q, Count
+from django.utils.translation import gettext_lazy as _
+
+
+# ========================================
+# 1. Choices (Enum) - glossary.mdc に基づき実装
+# ----------------------------------------
+# 【命名規則】親エンティティ名 + 属性名
+#   - MaterialGrade（Material の grade）
+#   - MaterialFinish（Material の finish）
+#   - BundleIncludes（Bundle の includes）
+#   - RfqLineIncludes（RfqLine の includes）
+#
+# 【理由】異なるエンティティで同名属性（includes, status等）
+#        が存在する場合の名前衝突を防止するため。
+# ========================================
+class MaterialGrade(models.TextChoices):
+    """材料の材質コード"""
+    SUS304 = 'SUS304', 'SUS304'
+    SS400 = 'SS400', 'SS400'
+    A5052 = 'A5052', 'A5052'
+
+
+class MaterialFinish(models.TextChoices):
+    """材料の表面仕上"""
+    MILL_SCALE = 'mill_scale', _('黒皮')
+    POLISHED = 'polished', _('研磨')
+    PICKLED = 'pickled', _('酸洗')
+    HAIRLINE = 'hairline', _('HL')
+
+
+# ========================================
+# 2. QuerySet クラス
+# ========================================
+class MaterialQuerySet(models.QuerySet):
+    """材料の検索クエリセット"""
+
+    def with_shape(self):
+        """形状を事前読み込み"""
+        return self.select_related('shape')
+
+    def for_list(self):
+        """一覧表示用"""
+        return self.with_shape().filter(is_active=True)
+
+    def active(self):
+        """有効なもののみ"""
+        return self.filter(is_active=True)
+
+    def by_grade(self, grade):
+        """材質でフィルタ"""
+        return self.filter(grade=grade)
+
+
+# ========================================
+# 3. Model クラス
+# ========================================
+class MaterialShape(models.Model):
+    """材料形状マスタ"""
+    # ... 詳細は Part 2 パターンA を参照 ...
+    pass
+
+
+class Material(models.Model):
+    """材料"""
+    id = models.UUIDField(_('材料ID'), primary_key=True, default=uuid.uuid4, editable=False)
+    # ... フィールド定義 ...
+
+    objects = MaterialQuerySet.as_manager()
+
+    class Meta:
+        db_table = 'materials'
+        verbose_name = _('材料')
+        verbose_name_plural = _('材料一覧')
+        ordering = ['name']
+        constraints = []
+
+    def __str__(self):
+        return self.name
+```
+
+---
+
+## 【Part 1】QuerySet実装テンプレート
+
+### 基本パターン
+
+```python
+from django.db import models
+from django.db.models import Q, Count, Case, When, Value, F, CharField
+
+
+class MaterialQuerySet(models.QuerySet):
+    """材料の検索クエリセット"""
+
+    # ========================================
+    # with_<relation>(): リレーションをEager Load
+    # ========================================
+    def with_shape(self):
+        """形状を事前読み込み"""
+        return self.select_related('shape')
+
+    # ========================================
+    # with_<computed>(): annotateで計算フィールド追加
+    # ========================================
+    def with_usage_count(self):
+        """使用回数をannotate"""
+        return self.annotate(usage_count=Count('recipe_materials'))
+
+    # ========================================
+    # for_<use_case>(): 用途別の最適化済みクエリ
+    # ========================================
+    def for_list(self):
+        """一覧表示用"""
+        return self.with_shape().filter(is_active=True)
+
+    # ========================================
+    # その他: 動詞/形容詞で命名
+    # - 状態フィルタ: active(), expired() など
+    # - フィールドフィルタ: by_grade(), by_date() など
+    # - 複合検索: search()
+    # ========================================
+    def active(self):
+        """有効なもののみ"""
+        return self.filter(is_active=True)
+
+    def by_grade(self, grade):
+        """材質でフィルタ"""
+        return self.filter(grade=grade)
+
+    def by_date(self, start_date, end_date):
+        """作成日の範囲でフィルタ"""
+        return self.filter(created_at__range=(start_date, end_date))
+
+    def search(self, keyword):
+        """
+        フリーワード検索。
+        対象: 表示名、材質、説明
+        """
+        if not keyword:
+            return self
+        return self.filter(
+            Q(name__icontains=keyword) |
+            Q(grade__icontains=keyword) |
+            Q(description__icontains=keyword)
+        )
+```
+
+### 集計パターン（with_<computed>の応用例）
+
+```python
+class RfqQuerySet(models.QuerySet):
+    """調達見積の検索クエリセット"""
+
+    def with_quote_status(self):
+        """
+        回答ステータスを集約してannotate。
+        - 全サプライヤが quoted → 'quoted'
+        - 1社でも quoting → 'quoting'
+        """
+        return self.annotate(
+            total_suppliers=Count('supplier_rfqs'),
+            quoted_count=Count(
+                'supplier_rfqs',
+                filter=Q(supplier_rfqs__status='quoted')
+            ),
+        ).annotate(
+            aggregated_status=Case(
+                When(total_suppliers=F('quoted_count'), then=Value('quoted')),
+                default=Value('quoting'),
+                output_field=CharField(),
+            )
+        )
+
+    def with_quote_progress(self):
+        """回答進捗（n/m社）をannotate"""
+        return self.annotate(
+            total_suppliers=Count('supplier_rfqs'),
+            quoted_count=Count(
+                'supplier_rfqs',
+                filter=Q(supplier_rfqs__status='quoted')
+            ),
+        )
+
+    def for_list(self):
+        """一覧表示用（N+1対策 + ステータス集約）"""
+        return (
+            self
+            .with_quote_status()
+            .with_quote_progress()
+            .filter(is_active=True)
+            .order_by('-created_at')
+        )
+```
+
+---
+
+## 【Part 2】Model実装テンプレート
+
+### パターンA: マスタ (MaterialShape)
+
+```python
+import uuid
+from django.db import models
+from django.utils.translation import gettext_lazy as _
+
+
+class MaterialShape(models.Model):
+    # 1. Fields (ID -> Relation -> Data -> System)
+    id = models.UUIDField(_('形状ID'), primary_key=True, default=uuid.uuid4, editable=False)
+
+    # Data Fields
+    name = models.CharField(
+        _('UI表示用形状名'),
+        max_length=50,
+        help_text=_('画面表示用の名称（例: 角パイプ, 丸棒）')
+    )
+    display_format = models.CharField(
+        _('表示フォーマット'),
+        max_length=255,
+        help_text=_('例: {width}×{height}×{thickness}')
+    )
+
+    # System Fields
+    is_active = models.BooleanField(_('有効フラグ'), default=True)
+    created_at = models.DateTimeField(_('作成日時'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('更新日時'), auto_now=True)
+
+    # 3. Meta
+    class Meta:
+        db_table = 'material_shapes'
+        verbose_name = _('材料形状')
+        verbose_name_plural = _('材料形状マスタ')
+        ordering = ['name']
+        constraints = []
+
+    # 4. __str__
+    def __str__(self):
+        return self.name
+```
+
+### パターンB: 実体 (Material)
+
+> **注意**: 実際のファイルでは、Enum と QuerySet を Model より前に定義すること（Part 0 参照）。
+> 以下は Model クラス単体のテンプレートとして記載。
+
+```python
+class Material(models.Model):
+    # 1. Fields (ID -> Relation -> Data -> System)
+
+    # ID Field
+    id = models.UUIDField(_('材料ID'), primary_key=True, default=uuid.uuid4, editable=False)
+
+    # Relation Fields
+    shape = models.ForeignKey(
+        'MaterialShape',
+        verbose_name=_('形状'),
+        on_delete=models.PROTECT,
+        related_name='materials',
+    )
+
+    # Data Fields
+    name = models.CharField(_('表示名'), max_length=255, help_text=_('例: SUS304 角パイプ 50×50×2.0'))
+    grade = models.CharField(
+        _('材質'),
+        max_length=50,
+        choices=MaterialGrade.choices,
+        help_text=_('例: SUS304, SS400, A5052')
+    )
+    display_dimension = models.CharField(
+        _('表示寸法'),
+        max_length=255,
+        help_text=_('例: 50×50×2.0, φ16')
+    )
+    dimension_a = models.DecimalField(
+        _('寸法A'),
+        max_digits=10,
+        decimal_places=2,
+        blank=True,
+        null=True,  # ER図: NULL 許可 (理由: 形状によっては不要な寸法のため)
+        help_text=_('形状に応じた第1寸法値（mm）')
+    )
+    dimension_b = models.DecimalField(
+        _('寸法B'),
+        max_digits=10,
+        decimal_places=2,
+        blank=True,
+        null=True,  # ER図: NULL 許可 (理由: 形状によっては不要な寸法のため)
+        help_text=_('形状に応じた第2寸法値（mm）')
+    )
+    # ... 必要に応じて dimension_f まで記述 ...
+
+    finish = models.CharField(
+        _('仕上'),
+        max_length=50,
+        blank=True,
+        null=True,  # ER図: NULL 許可 (理由: 仕上指定がない材料も存在するため)
+        choices=MaterialFinish.choices,  # Enumを適用
+        help_text=_('例: 黒皮, 研磨, 酸洗, HL')
+    )
+    description = models.TextField(
+        _('説明・備考'),
+        blank=True,
+        null=True,  # ER図: NULL 許可 (理由: 任意入力項目のため)
+        help_text=_('材料に関する補足情報や特記事項を記載')
+    )
+
+    # System Fields
+    is_active = models.BooleanField(_('有効フラグ'), default=True)
+    created_at = models.DateTimeField(_('作成日時'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('更新日時'), auto_now=True)
+
+    # Manager (カスタムQuerySetがある場合)
+    objects = MaterialQuerySet.as_manager()
+
+    # 2. clean()
+    def clean(self):
+        super().clean()
+        # 必要に応じてバリデーションロジックを追加
+
+    # 3. Meta
+    class Meta:
+        db_table = 'materials'
+        verbose_name = _('材料')
+        verbose_name_plural = _('材料一覧')
+        ordering = ['name']
+        constraints = []  # 制約がない場合も空リスト [] を明示する。
+
+    # 4. __str__
+    def __str__(self):
+        return self.name
+```

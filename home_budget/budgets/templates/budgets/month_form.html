@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}新規月次作成 - 生活費精算{% endblock %}
+
+{% block content %}
+<div class="page-container page-container--narrow">
+    <div class="page-header">
+        <h1 class="page-title">📆 新規月次作成</h1>
+        <p class="page-subtitle">精算対象となる月を作成します</p>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="post" class="form">
+                {% csrf_token %}
+                
+                {% if form.errors %}
+                <div class="alert alert-error">
+                    {% for field, errors in form.errors.items %}
+                        {% for error in errors %}
+                            <p>{{ error }}</p>
+                        {% endfor %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="form-group">
+                    <label for="id_year_month" class="form-label">対象月</label>
+                    {{ form.year_month }}
+                    <p class="form-help">精算を行う月を選択してください（YYYY-MM形式）</p>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        作成する
+                    </button>
+                    <a href="{% url 'budgets:month_list' %}" class="btn btn-outline">
+                        キャンセル
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="page-nav">
+        <a href="{% url 'budgets:month_list' %}" class="btn btn-outline">
+            ← 月次一覧に戻る
+        </a>
+    </div>
+</div>
+{% endblock %}
+

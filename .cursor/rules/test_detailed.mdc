@@ -1,0 +1,450 @@
+---
+description: "テストコード実装の詳細ガイド。シナリオビルダー・アサーションヘルパーの具体的なコード例。test_summary.mdc のルールに基づく実装時に参照。"
+globs: **/tests/**/*.py
+alwaysApply: false
+---
+
+# テストコード作成ルール
+
+このルールはテストコードの作成・修正・リファクタリング時に適用する。
+
+---
+
+## テストコード共通ルール
+### 命名ルール（テクニカルライティングを優先）
+- 技術的な手段や内部実装ではなく、**達成状態を簡潔に表現**する。
+- 日本語の自然文で、読んだ瞬間に意図が分かる名前にする。
+- テストコードの用語は `agent.mdc` の「用語の統一」ルールに従う。
+
+#### 命名の具体例
+```python
+# 良い例: 目的が短文で分かり、日本語である。
+def test_最小構成の材料のみで正常に出力される():
+    ...
+
+def 正常_最終工程を追加する(recipe_def):
+    ...
+
+def assert_工程の出力名が正しい(step, *, expected_output_name):
+    ...
+
+# 悪い例: 技術寄りで意図が曖昧で、英語である。
+def test_add_step_success():
+    ...
+
+def build_recipe_definition():
+    ...
+
+def assert_step_output_name(step, expected_output_name):
+    ...
+```
+
+### 期待値は `expected_` で統一し、キーワード引数で渡す
+- 期待値の意味を引数名で明示し、順序依存の誤読を防止する。
+
+### データ型は仕様通りに統一
+- 数量は `Decimal`、IDは `uuid.UUID` を使用する。
+- `float` は使わない（丸め誤差による仕様逸脱を防ぐ）。
+
+---
+
+## テストケース作成ルール
+### テストは仕様の合否条件をコードで検証する
+- テストケース名は `test_` で始める。
+- 仕様書のACをテストケースとして書き、期待値と実値の一致で合否を判定する。
+- 1テスト1関心に絞り、失敗時に原因が即特定できる構造にする。
+
+### AAA（Arrange / Act / Assert）を必ず明示
+- セクションコメントで構造を固定化し、流れを一目で追えるようにする。
+- テスト本文は **前提 → 実行 → 検証** の順序を崩さない。
+
+#### ー具体例ー
+```python
+def test_最小構成の材料のみで正常に出力される():
+    """
+    T1-01: define() が仕様通りの辞書を返すこと (AC-001, AC-002, AC-003)
+    """
+    # Arrange
+    recipe_def = 正常_標準出力でRecipeDefinitionを生成する()
+    step_id = 正常_最終工程を追加する(recipe_def)
+    正常_工程に材料を追加する(recipe_def, step_id=step_id)
+
+    # Act
+    result = recipe_def.define()
+
+    # Assert
+    assert_レシピ定義の出力構造が正しい(result)
+```
+
+### 仕様トレーサビリティ（T番号・AC番号の明記）
+- docstring に `T1-01` と `AC-xxx` を明示し、仕様↔テストの対応を固定化する。
+- 仕様変更時に影響範囲が即特定できることを最優先にする。
+
+### 期待値はArrangeのデータ構造から動的に導出する
+- Assert セクションで検証する期待値は、Arrange セクションで生成・設定したデータから**動的に導出する**。シナリオビルダーが内部で決定した値をテストコード内にリテラルで再記述しない。
+- シナリオビルダーの戻り値に含まれる値（ID、名称、数量、単位など）は、戻り値の辞書から参照する。
+- テスト本文の Arrange で明示的に渡す設定値（例: `note`, `handling`, `supply_method`）は、Arrange で変数に代入し、Assert ではその変数を参照する。Arrange と Assert の両方にリテラルを書かない。
+- 仕様上の固定デフォルト値（例: 未設定フィールドの `None`）、AC が具体値を直接指定している場合（例: `includes` が `"material_only"` であること）は、リテラルで記述してよい。
+- 期待値の取得がネスト構造のナビゲーションを伴う場合は、シナリオビルダー（`正常_*の期待データを取得する`）に分離し、テスト本文でのネスト辞書アクセスを避ける。
+
+#### ー判断基準ー
+| 期待値の性質 | 例 | 導出方法 | リテラル記述 |
+|---|---|---|---|
+| シナリオビルダーが内部で決定した値 | `output_name`, `quantity`, `unit`, `sequence` | ビルダー戻り値またはデータ取得ビルダーから参照 | **禁止** |
+| テスト本文で明示的に渡した設定値 | `note`, `handling`, `supply_method` | Arrange で変数に代入し、その変数を参照 | **禁止** |
+| 仕様上の固定デフォルト値 | 未設定時の `None` | リテラル | 許容 |
+| ACが具体値を直接指定 | `"material_only"`, `"material_included"` | リテラル | 許容 |
+
+#### ー具体例ー
+```python
+# ===================================================================
+# 例1: シナリオビルダーが内部で決定した値
+#       → ビルダー戻り値 or データ取得ビルダーから参照する
+# ===================================================================
+
+# 良い例: 期待値をデータ構造から動的に取得する
+#
+# Arrange
+data = 正常_subassembly付きで全rfq_lineをassign済みのRfqComposerを生成する()
+expected_sub = 正常_recipesからsubassemblyの期待データを取得する(
+    data["assignments"],
+    recipe_id=data["recipe_id"],
+    step_id=data["step2_id"],
+    subassembly_step_id=data["subassembly_step_id"],
+)
+
+# Assert — 全期待値がデータ構造由来
+assert_subassemblyのstep_output_nameが正しい(
+    sub, expected_step_output_name=expected_sub["step_output_name"],
+)
+assert_subassemblyのquantityが正しい(
+    sub, expected_quantity=expected_sub["quantity"],
+)
+assert_subassemblyのunitが正しい(
+    sub, expected_unit=expected_sub["unit"],
+)
+
+# 悪い例: シナリオビルダーが内部で設定した値をリテラルで再記述
+#
+# ビルダー内の定義値と「たまたま一致」しているだけで、
+# 出力がソースデータから正しく導出されたことを証明できない。
+# ビルダーの値が変わるとテスト側も手動修正が必要になる。
+#
+assert_subassemblyのstep_output_nameが正しい(
+    sub, expected_step_output_name="Sub Component",        # ← リテラル
+)
+assert_subassemblyのquantityが正しい(
+    sub, expected_quantity=Decimal("2"),                    # ← リテラル
+)
+assert_subassemblyのunitが正しい(
+    sub, expected_unit="piece",                            # ← リテラル
+)
+
+# ===================================================================
+# 例2: テスト本文で明示的に渡した設定値
+#       → Arrange で変数に代入し、Assert ではその変数を参照する
+# ===================================================================
+
+# 良い例: Arrange で変数に代入し、Assert で同じ変数を参照する
+#
+# Arrange
+material_note = "material memo"
+正常_material_rfq_lineにnotesを設定する(
+    composer, supplier_id=data["supplier_id"],
+    rfq_line_id=data["step1_material_rfq_line_id"],
+    note=material_note,
+)
+offcut_handling = "return"
+正常_offcut_handlingを設定する(
+    composer, ..., handling=offcut_handling,
+)
+
+# Assert
+assert_materialのnotesが正しい(
+    mat, expected_notes=material_note,                     # ← 変数を参照
+)
+assert_bundleのoffcut_handlingが正しい(
+    bundle, expected_offcut_handling=offcut_handling,       # ← 変数を参照
+)
+
+# 悪い例: Arrange と Assert の両方にリテラルを書いている
+#
+# Arrange
+正常_offcut_handlingを設定する(
+    composer, ..., handling="return",                       # ← リテラル
+)
+
+# Assert
+assert_bundleのoffcut_handlingが正しい(
+    bundle, expected_offcut_handling="return",              # ← 同じリテラルを再記述
+)
+```
+
+### 例外テストは「構造」まで検証する
+- `pytest.raises` で例外を捕捉し、`error_code` と `details` を必ず検証する。
+- エラーメッセージや参照IDなど **仕様で定義された詳細** まで確認する。
+- 1テスト内の `pytest.raises` ブロックは **1つまで** とする。複数の例外シナリオは別テストまたは `parametrize` に分割する。
+- `pytest.raises` には具体的な例外クラス（例: `DuplicateSupplierIdError`）を指定する。`Exception` のような汎用クラスは使わない。横断テストでは共通の親例外クラス（例: `ValueError`）を指定してよい。
+- エラーの構造的検証（属性の存在チェック、`details` の型チェック）は横断テスト `Test_例外情報の検証` クラスに集約する。個別のエラーテストではエラーコードとエラー詳細の **値** のみを検証する。
+
+#### ー個別エラーテストの具体例ー
+```python
+# 良い例: エラーコードとエラー詳細の値のみ検証する
+error = excinfo.value
+assert_エラーコードが正しい(
+    error,
+    expected_error_code="DUPLICATE_SUPPLIER_ID",
+)
+assert_エラー詳細のsupplier_idが正しい(
+    error,
+    expected_supplier_id=supplier_id,
+)
+
+# 悪い例: 個別エラーテストで構造検証を毎回行う
+error = excinfo.value
+assert_エラーの必須属性が揃っている(error)  # ← 横断テストに集約すべき
+assert_エラー詳細の構造が正しい(error)       # ← 横断テストに集約すべき
+assert_エラーコードが正しい(
+    error,
+    expected_error_code="DUPLICATE_SUPPLIER_ID",
+)
+```
+
+### 似たケースは `parametrize` で統合し、`id` を明示
+- 重複ケースは `pytest.mark.parametrize` に統合し、`id` に T番号と短い説明を書く。
+- テストレポート上で失敗ケースが即判別できる状態にする。
+- テスト本文が必要とする値は `parametrize` の引数に全て含める。parametrize パラメータから別の値を導出する条件分岐をテスト本文に書かない。
+- テスト本文内に `for` 文・ループを書かない。複数の入力値を検証する場合は `parametrize` に分離する。
+- `id` には実装のメソッド名（例: `add_step`）を書かず、ドメイン用語による日本語の説明を書く。
+
+#### ー `id` の具体例ー
+```python
+# 良い例: ドメイン用語で「何を検証するか」が分かる
+pytest.param(..., id="T2-05a materialのquantityのみ指定")
+pytest.param(..., id="T3-01 工程追加時の数量検証")
+
+# 悪い例: 実装のメソッド名をそのまま使っている
+pytest.param(..., id="T3-01 add_step")
+pytest.param(..., id="T3-01 add_material")
+```
+
+### 章立てで仕様の読み順と一致させる
+- `STEP1 / STEP2 / STEP3` の区切りとテストの章立てを一致させる。
+- クラスdocstringで目的を1行で示す。
+
+### Assertでのリスト要素の存在確認と取得はアサーションヘルパーを経由する
+- リスト・配列から要素を検索して存在を確認する場合は、アサーションヘルパー（`assert_*が存在する`）を経由する。
+- このヘルパーは存在確認（assert）を行ったうえで、見つかった要素を返してよい（find-and-assert パターン）。返された要素は後続の `assert_` 関数でさらに検証する。
+- テスト本文での `[0]` や `[index]` によるインデックス直接アクセスは使用しない。
+- アサーションヘルパーによる検証後にも、リスト要素の取得が必要な場合は、アサーションヘルパーの責務を考慮し、Assert セクションでシナリオビルダー（`正常_*を取得する`）を要素取得目的で呼び出すこと。ただし、存在確認を伴う場合は find-and-assert パターンを優先する。
+
+#### ー具体例ー
+```python
+# 良い例①: find-and-assert パターンで存在確認と取得を兼ねる
+#
+# assert_bundleがrecipe_idとstep_idの組で存在する() の内部実装:
+#   bundle = next((b for b in bundles if b["recipe_id"] == ... and ...), None)
+#   assert bundle is not None   ← 存在しなければ AssertionError
+#   return bundle
+#
+bundle = assert_bundleがrecipe_idとstep_idの組で存在する(
+    result["bundles"],
+    expected_recipe_id=data["recipe_id"],
+    expected_step_id=data["step_id"],
+)
+assert_bundleのキーが仕様通りである(bundle)
+
+# 良い例②: 存在確認済みの親要素から、シナリオビルダーで子要素を取得し検証する
+mat = 正常_materialを取得する(
+    bundle, material_id=data["material_id"],
+)
+assert_materialのキーが仕様通りである(mat)
+
+# 悪い例①: 存在確認が必要な場面でシナリオビルダーを使っている
+#
+# 正常_bundleを取得する() の内部実装:
+#   return next(b for b in result["bundles"] if b["recipe_id"] == ... and ...)
+#   ← assert を含まない。存在しない場合は StopIteration が送出され、
+#     テスト失敗時に「何が見つからなかったのか」が不明瞭になる。
+#
+bundle = 正常_bundleを取得する(
+    result, recipe_id=data["recipe_id"], step_id=data["step_id"],
+)
+assert_bundleのキーが仕様通りである(bundle)
+
+# 悪い例②: インデックスで直接アクセス（存在保証がない）
+step = result["steps"][0]
+assert_工程IDの形式が正しい(step)
+```
+
+### Django テンプレートタグ・継承テンプレートのテスト方式
+
+カスタムテンプレートタグが「継承（extends）＋block 内」で正しくパースされ HTML として出力されることを検証するテストでは、以下に従う。
+
+- **推奨方式**: テストコード内で親・子テンプレートのソースを文字列で定義し、テンプレート名→ソースの辞書で持つ。辞書から名前解決する Loader（`get_template_sources` / `get_contents` を実装）を用意し、その Loader を先頭にした Engine で `get_template("子の名前")` → `render(context)` する。親テンプレートには `{% static %}` を含めない（STORAGES の差し替えが不要になる）。Engine の 2 番目に `app_directories.Loader` を置き、タグ内部の `get_template`（例: confirm_dialog.html）が解決できるようにする。
+- **本番テンプレートを直接使わない**: 本番テンプレート（例: rfq_list.html）を `loader.get_template(...)` で読んで検証すると、本番の ID・文言・構造変更でテストが壊れる。検証したいのは「継承＋block でタグが動くこと」なので、本番固有の内容に依存しない。
+- **テスト専用 .html を増やさない**: `apps/.../templates/.../_test_extends_*.html` のようにアプリ配下にテスト専用テンプレートを置かない。テストコード内の辞書＋Loader で完結させる。
+- **アサートはタグの振る舞いのみ**: 出力に含まれることを検証するのは、イベント名・クラス名・テストで用意した id などタグの振る舞いに関わるものに限定する。本番固有の ID や文言（例: 本番ダイアログ id、本番メッセージ文）はアサートに含めない。あわせて「タグ構文がそのまま出力されていない」ことを `assertNotIn("{% タグ名", content)` で検証する。
+- **Loader の実装**: `django.template.loaders.base.Loader` を継承し、`get_template_sources(template_name)` で辞書に存在するときだけ `Origin(name=..., template_name=..., loader=self)` を yield し、`get_contents(origin)` で `templates_dict[origin.template_name]` を返す。Engine には Loader を文字列パス（例: `"tests.xxx.test_yyy._DictLoader"`）とオプションのタプルで渡す。
+- **参照例**: `tests/cenobi_ui_kit/test_cenobi_ui_tags.py` の `_DictLoader` と `test_継承とblock末尾でconfirm_dialogがHTMLとして出力される` を参照する。
+
+#### ー具体例ー
+```python
+# 良い例: テスト内で親子を辞書定義し、辞書用 Loader と Engine でレンダ。アサートは振る舞いのみ。
+templates_dict = {"base": "<html><body>{% block content %}{% endblock %}</body></html>", "child": "..."}
+engine = Engine(loaders=[("tests...._DictLoader", {"templates_dict": templates_dict}), "django.template.loaders.app_directories.Loader"], libraries=...)
+content = engine.get_template("child").render(Context({"request": request}))
+self.assertIn("@open-confirm-dialog.window", content)
+self.assertIn("test-dialog", content)  # テストで渡した id
+self.assertNotIn("{% cenobi_confirm_dialog", content)
+
+# 悪い例: 本番テンプレートを直接読み、本番の ID・文言でアサート（本番変更でテストが壊れる）
+template_obj = loader.get_template("rfqs/rfq_list.html")
+content = template_obj.render(context)
+self.assertIn("rfq-edit-unsaved-close-dialog", content)
+self.assertIn("入力内容が保存されません", content)
+```
+
+---
+
+## シナリオビルダー関数作成ルール
+- シナリオビルダー関数名は `正常_` / `異常_` で始め、シナリオの意図を明確にする。
+- 前提作成はテスト本文に書かず、`tests/` 配下の `scenario_builders.py` に分離する。配置先フォルダーは関連する機能書・仕様書・テスト計画書を元に確認する。
+- 「前提作成」とは、テスト対象のオブジェクト生成・状態変更などのドメイン操作を指す。
+- 生成済みデータ構造からの値の取得（例: `recipe_info["recipe_id"]`）も Arrange / Act セクションではシナリオビルダーに含める。テスト本文ではデータ構造自体をビルダーの引数として渡し、値の取得はビルダー内部で行う。
+- Assert セクションでは、テストが「何を検証しているか」の透明性を保つため、期待値として生成済みデータ構造から値を取得してよい（例: `expected_recipe_id=recipe_info["recipe_id"]`）。
+- 1関数＝1操作／1目的に限定し、複数工程のArrangeを1つにまとめない。
+- 関数名は「達成したい状態」を短文で表現し、手段や詳細条件は書かない。
+- 引数は最小限に留め、関数内で生成できる値は引数にしない。
+- 外部で生成した値やオブジェクトが必要な場合のみ、引数として受け取る。
+- 外部値を受ける場合はキーワード専用引数にして意図を明確化する。
+- 「追加する」系は対象オブジェクトを引数で受け、内部で別オブジェクトを生成しない。
+- 内部生成したIDや仕様は戻り値で返し、Assert側で参照できるようにする。
+- 複合ビルダーは「前提を用意する」用途に限定し、戻り値の構造を固定する。
+- シナリオビルダー（`正常_` / `異常_`）は Arrange・Act・Assert（要素取得目的に限る）で使用できる。ビルダー内に `pytest.raises` や Assert を含めず、1関数＝1操作に限定する。Assert セクションでシナリオビルダーを使用する場合は、compose 結果からの要素取得など検証対象の値を参照する目的に限定し、状態変更操作には使用しない。
+- シナリオビルダーは正常に機能する前提で使用される。要素の存在確認や戻り値の検証など、デバッグ目的の `assert` をビルダー内部に含めない。前提データが不正な場合の失敗は、後続の処理で自然に検出される。
+- デフォルト値は仕様の型に統一し、`Decimal` / `uuid.UUID` / unit文字列以外は使わない。
+- 全ビルダーに1行 docstring を付ける。「何をして何を返すか」を簡潔に書く。
+- `getattr` や `**kwargs` 展開などのメタプログラミングはビルダー内部に閉じる。テスト本文にメタプログラミング的コードを書かない。
+- テスト本文からドメインメソッド（例: `add_material()`, `add_subassembly()`, `get_all_assignments()`）を直接呼び出さない。Arrange・Act ともにシナリオビルダー経由で行う。
+
+### シナリオビルダー関数名の具体例
+```python
+# 良い例: 達成状態が短文で分かる
+def 正常_最終工程を追加する(recipe_def):
+    ...
+
+def 正常_工程に加工を追加する(recipe_def, *, step_id):
+    ...
+
+# 悪い例: 達成状態が曖昧 / 詳細条件を詰め込みすぎ
+def 正常_レシピを操作する(recipe_def):
+    ...
+
+def 正常_step1とstep2を追加して材料と加工も追加する(recipe_def):
+    ...
+```
+
+### メタプログラミングの具体例
+```python
+# 良い例: getattr はビルダー内部に閉じている
+# （scenario_builders.py）
+def 異常_不完全なquantityとunitでassignmentする(
+    assignment,
+    *,
+    method_name,
+    supplier_id,
+    recipe_info,
+    item_id_key,
+    quantity,
+    unit,
+):
+    """quantity/unitの片方のみを指定してassignmentを試みる"""
+    method = getattr(assignment, method_name)
+    method(
+        supplier_id,
+        recipe_info["recipe_id"],
+        recipe_info["step_id"],
+        recipe_info[item_id_key],
+        quantity,
+        unit,
+    )
+
+# （テスト本文）
+with pytest.raises(IncompleteQuantityUnitError) as excinfo:
+    異常_不完全なquantityとunitでassignmentする(
+        assignment,
+        method_name=method_name,
+        supplier_id=supplier_id,
+        recipe_info=recipe_info,
+        item_id_key=item_id_key,
+        quantity=quantity,
+        unit=unit,
+    )
+
+# 悪い例: テスト本文で getattr や辞書展開を実行している
+base = scenario_builder()
+recipe_def = base["recipe_def"]
+method = getattr(recipe_def, base["method_name"])     # ← テスト本文に getattr
+call_kwargs = base["call_kwargs_base"].copy()          # ← テスト本文で辞書操作
+call_kwargs[base["quantity_arg"]] = invalid_val
+with pytest.raises(InvalidQuantityError) as excinfo:
+    method(**call_kwargs)                              # ← テスト本文で **kwargs 展開
+```
+
+---
+
+## アサーションヘルパー関数作成ルール
+- 検証は `tests/` 配下の `assertion_helpers.py` の関数で行う。配置先フォルダーは関連する機能書・仕様書・テスト計画書を元に確認する。
+- 1関数＝1検証対象に限定し、複数の関心をまとめない。
+- 関数名は `assert_` で始める。
+- 期待値は `expected_` で統一し、キーワード専用引数で受け取る。
+- ヘルパーは対象オブジェクトの生成・変更はしない。ただし、リストから対象を検索して存在を確認する **find-and-assert パターン**に限り、見つかった要素を戻り値として返してよい。このパターンを使う場合、返された要素に対して後続の `assert_` 関数で必ずさらなる検証を行う。
+- **検索キーを値検証の代用にしない**: find-and-assert パターンの検索条件（例: `expected_step_id`）は要素の存在確認のための検索キーであり、そのフィールドの値検証を兼ねない。仕様で定義された各フィールドは、必ず専用の `assert_` ヘルパーで明示的に検証する。
+- 形式や構造の検証を先に行い、その後に値を検証する。
+- 件数検証と要素検証は分離し、存在保証を明示する。
+- エラー詳細の存在/非存在は専用ヘルパーで明示的に検証する。
+- エラーメッセージはテンプレートから生成し、文字列を直書きしない。
+- `assertion_helpers.py` 内のヘルパー関数は、検証対象の関心ごとにセクションコメント（`# --- セクション名 ---`）でグルーピングする。
+
+### 検索キーと値検証の分離の具体例
+```python
+# 良い例: 検索キーで存在確認した後、同じフィールドを明示的に値検証する
+sub = assert_subassemblyがsubassemblies一覧に存在する(
+    bundle["subassemblies"],
+    expected_step_id=expected_sub["step_id"],               # ← 存在確認のための検索キー
+)
+assert_subassemblyのstep_idが正しい(                        # ← step_id の値検証（別途必須）
+    sub, expected_step_id=expected_sub["step_id"],
+)
+assert_subassemblyのstep_output_nameが正しい(
+    sub, expected_step_output_name=expected_sub["step_output_name"],
+)
+
+# 悪い例: find-and-assert の検索条件で step_id は検証済みとみなしている
+sub = assert_subassemblyがsubassemblies一覧に存在する(
+    bundle["subassemblies"],
+    expected_step_id=expected_sub["step_id"],               # ← これは存在確認のみ
+)
+# ← step_id の assert が欠落。「暗黙的にカバー済み」は許容しない
+assert_subassemblyのstep_output_nameが正しい(
+    sub, expected_step_output_name=expected_sub["step_output_name"],
+)
+```
+
+### アサーションヘルパー関数名の具体例
+```python
+# 良い例: 達成状態が短文で分かる
+def assert_工程の出力名が正しい(step, *, expected_output_name):
+    ...
+
+def assert_エラー詳細の工程名が正しい(error, *, expected_step_name):
+    ...
+
+# 悪い例: 達成状態が曖昧 / 検証対象が広すぎる
+def assert_recipe_is_valid(result):
+    ...
+
+def assert_工程の出力名と数量と単位が正しい(step, expected_name, expected_quantity, expected_unit):
+    ...
+```

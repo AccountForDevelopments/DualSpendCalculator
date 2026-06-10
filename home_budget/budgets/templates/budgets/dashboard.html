@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}ダッシュボード - 生活費精算{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1 class="dashboard-title">ダッシュボード</h1>
+        <p class="dashboard-subtitle">月次の生活費精算状況を確認できます</p>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="dashboard-content">
+        {% if all_months %}
+        <!-- 月選択 -->
+        <div class="month-selector-wrapper">
+            <form method="get" class="month-selector-form">
+                <label for="month-select" class="form-label">対象月:</label>
+                <select name="month" id="month-select" class="month-select" onchange="this.form.submit()">
+                    {% for month in all_months %}
+                    <option value="{{ month.pk }}" {% if selected_month and selected_month.pk == month.pk %}selected{% endif %}>
+                        {{ month.year_month }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
+
+        {% if settlement %}
+        <!-- 精算サマリ -->
+        <div class="settlement-summary">
+            <div class="settlement-header">
+                <div class="settlement-title">精算サマリ</div>
+                <div class="settlement-month">{{ settlement.year_month }}</div>
+            </div>
+            
+            <div class="settlement-body">
+                <!-- 警告メッセージ -->
+                {% if settlement.income_missing %}
+                <div class="warning-box">
+                    <span class="warning-icon">⚠️</span>
+                    <div class="warning-content">
+                        <div class="warning-title">収入が未入力です</div>
+                        <div class="warning-text">
+                            収入を入力すると負担割合と精算額が計算されます。
+                            <a href="{% url 'budgets:month_detail' selected_month.pk %}">月次詳細で入力する →</a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if settlement.payer_missing_count > 0 %}
+                <div class="warning-box">
+                    <span class="warning-icon">⚠️</span>
+                    <div class="warning-content">
+                        <div class="warning-title">支払者が未設定の明細があります</div>
+                        <div class="warning-text">
+                            {{ settlement.payer_missing_count }}件の生活費対象明細で支払者が未設定です。
+                            <a href="{% url 'budgets:month_detail' selected_month.pk %}?is_living_cost=true&payer=unset">明細を確認する →</a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- 精算結果 -->
+                {% if not settlement.income_missing and settlement.total > 0 %}
+                <div class="settlement-result">
+                    <div class="settlement-result-label">精算結果</div>
+                    <div class="settlement-result-text">
+                        {{ settlement.settlement_text }}
+                    </div>
+                </div>
+                {% elif settlement.total == 0 %}
+                <div class="settlement-result">
+                    <div class="settlement-result-label">精算結果</div>
+                    <div class="settlement-result-text">
+                        生活費対象の明細がありません
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- ユーザー別詳細 -->
+                <div class="settlement-grid">
+                    <div class="settlement-user">
+                        <div class="settlement-user-name">👤 {{ settlement.user_a_name }}</div>
+                        <div class="settlement-detail">
+                            <span class="settlement-detail-label">月収</span>
+                            <span class="settlement-detail-value settlement-detail-value--amount">
+                                {% if settlement.income_a %}¥{{ settlement.income_a|intcomma }}{% else %}-{% endif %}
+                            </span>
+                        </div>
+                        <div class="settlement-detail">
+                            <span class="settlement-detail-label">負担割合</span>
+                            <span class="settlement-detail-value settlement-detail-value--ratio">
+                                {{ settlement.ratio_a_percent }}
+                            </span>
+                        </div>
+                        <div class="settlement-detail">
+                            <span class="settlement-detail-label">負担額</span>
+                            <span class="settlement-detail-value settlement-detail-value--amount">
+                                ¥{{ settlement.share_a|intcomma }}
+                            </span>
+                        </div>
+                        <div class="settlement-detail">
+                            <span class="settlement-detail-label">立替額</span>
+                            <span class="settlement-detail-value settlement-detail-value--amount">
+                                ¥{{ settlement.paid_a|intcomma }}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="settlement-user">
+                        <div class="settlement-user-name">👤 {{ settlement.user_b_name }}</div>
+                        <div class="settlement-detail">
+                            <span class="settlement-detail-label">月収</span>
+                            <span class="settlement-detail-value settlement-detail-value--amount">
+                                {% if settlement.income_b %}¥{{ settlement.income_b|intcomma }}{% else %}-{% endif %}
+                            </span>
+                        </div>
+                        <div class="settlement-detail">
+                            <span class="settlement-detail-label">負担割合</span>
+                            <span class="settlement-detail-value settlement-detail-value--ratio">
+                                {{ settlement.ratio_b_percent }}
+                            </span>
+                        </div>
+                        <div class="settlement-detail">
+                            <span class="settlement-detail-label">負担額</span>
+                            <span class="settlement-detail-value settlement-detail-value--amount">
+                                ¥{{ settlement.share_b|intcomma }}
+                            </span>
+                        </div>
+                        <div class="settlement-detail">
+                            <span class="settlement-detail-label">立替額</span>
+                            <span class="settlement-detail-value settlement-detail-value--amount">
+                                ¥{{ settlement.paid_b|intcomma }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 統計情報 -->
+                <div class="stats-row">
+                    <div class="stat-item">
+                        <div class="stat-value">¥{{ settlement.total|intcomma }}</div>
+                        <div class="stat-label">生活費合計</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">{{ settlement.living_cost_count }}件</div>
+                        <div class="stat-label">生活費対象</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">{{ settlement.total_count }}件</div>
+                        <div class="stat-label">全明細</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="quick-links">
+            <h3 class="links-title">クイックリンク</h3>
+            <div class="links-grid">
+                <a href="{% url 'budgets:month_list' %}" class="link-card">
+                    <span class="link-icon">📅</span>
+                    <span class="link-text">月次管理</span>
+                </a>
+            </div>
+        </div>
+
+        {% else %}
+        <!-- 月次データがない場合 -->
+        <div class="summary-card">
+            <div class="card-header">
+                <span class="card-icon">📊</span>
+                <h2 class="card-title">精算サマリ</h2>
+            </div>
+            <div class="card-body">
+                <p class="placeholder-text">
+                    対象月を作成して精算を開始してください。
+                </p>
+            </div>
+        </div>
+
+        <div class="quick-links">
+            <h3 class="links-title">クイックリンク</h3>
+            <div class="links-grid">
+                <a href="{% url 'budgets:month_list' %}" class="link-card">
+                    <span class="link-icon">📅</span>
+                    <span class="link-text">月次管理</span>
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+

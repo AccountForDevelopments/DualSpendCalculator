@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% load static %}
+
+{% block title %}{{ month.year_month }} - 月次詳細 - 生活費精算{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <div class="page-header-content">
+            <h1 class="page-title">📊 {{ month.year_month }}</h1>
+            <p class="page-subtitle">収入入力・CSV取り込み・明細の確認・編集</p>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="detail-grid">
+        <!-- 収入入力セクション -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-icon">💰</span>
+                <h2 class="card-title">収入入力</h2>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'budgets:income_update' month.pk %}" class="income-form">
+                    {% csrf_token %}
+                    
+                    <div class="income-grid">
+                        <div class="form-group">
+                            <label for="id_income_a" class="form-label">
+                                {{ month.user_a.username }} の月収
+                            </label>
+                            {{ income_form.income_a }}
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="id_income_b" class="form-label">
+                                {{ month.user_b.username }} の月収
+                            </label>
+                            {{ income_form.income_b }}
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        収入を保存
+                    </button>
+                </form>
+
+                {% if month.has_income %}
+                <div class="ratio-display">
+                    <h4 class="ratio-title">負担割合</h4>
+                    <div class="ratio-grid">
+                        <div class="ratio-item">
+                            <span class="ratio-label">{{ month.user_a.username }}</span>
+                            <span class="ratio-value">{{ ratio_a_percent }}</span>
+                        </div>
+                        <div class="ratio-item">
+                            <span class="ratio-label">{{ month.user_b.username }}</span>
+                            <span class="ratio-value">{{ ratio_b_percent }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="ratio-placeholder">
+                    <p>収入を入力すると、負担割合が自動計算されます</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- CSVアップロードセクション -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-icon">📤</span>
+                <h2 class="card-title">CSV取り込み</h2>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'csv_import:csv_upload' month.pk %}" enctype="multipart/form-data" class="csv-upload-form">
+                    {% csrf_token %}
+                    
+                    <div class="form-group">
+                        <label for="id_csv_file" class="form-label">CSVファイル</label>
+                        {{ csv_form.csv_file }}
+                        <p class="form-help">エポスカード形式のCSVファイルをアップロードしてください</p>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        アップロード
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 明細サマリ -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-header-left">
+                <span class="card-icon">📋</span>
+                <h2 class="card-title">明細サマリ</h2>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <span class="summary-label">取り込み件数</span>
+                    <span class="summary-value">{{ month.transaction_count }}件</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">生活費対象</span>
+                    <span class="summary-value">{{ month.living_cost_count }}件</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">生活費合計</span>
+                    <span class="summary-value">¥{{ month.total_living_cost|intcomma }}</span>
+                </div>
+            </div>
+            {% if month.transaction_count == 0 %}
+            <div class="empty-state empty-state--small">
+                <p>明細がまだありません。CSVをアップロードしてください。</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if month.transaction_count > 0 %}
+    {% include "transactions/partials/transaction_list_section.html" %}
+    {% endif %}
+
+    <div class="page-nav">
+        <a href="{% url 'budgets:month_list' %}" class="btn btn-outline">
+            ← 月次一覧に戻る
+        </a>
+        <a href="{% url 'dashboard' %}" class="btn btn-outline">
+            ダッシュボード
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if month.transaction_count > 0 %}
+<script type="module" src="{% static 'budgets/js/month_detail.js' %}"></script>
+{% endif %}
+{% endblock %}

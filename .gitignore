@@ -1,0 +1,14 @@
+# ローカル環境変数（秘密情報）。テンプレートは env.example / .env.example を参照
+env
+.env
+
+# Python 仮想環境・バイトコード・キャッシュ
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# ローカル専用リファクタ指針（リポジトリに含めない）
+refactoring_20260604.md

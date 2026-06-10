@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: homebudget_app_db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-homebudget_app}
+      POSTGRES_USER: ${POSTGRES_USER:-homebudget}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-homebudget}
+    volumes:
+      - postgres_data_app:/var/lib/postgresql/data
+
+  web:
+    build:
+      context: .
+    container_name: homebudget_app_web
+    env_file:
+      - env
+    depends_on:
+      - db
+    volumes:
+      - ./home_budget:/app/home_budget
+    ports:
+      - "${HOST_WEB_PORT:-8000}:8000"
+    command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+
+volumes:
+  postgres_data_app:
+
+

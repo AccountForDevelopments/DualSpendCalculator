@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}月次管理 - 生活費精算{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <div class="page-header-content">
+            <h1 class="page-title">📅 月次管理</h1>
+            <p class="page-subtitle">対象月の一覧と新規作成</p>
+        </div>
+        <div class="page-actions">
+            <a href="{% url 'budgets:month_create' %}" class="btn btn-primary">
+                <span class="btn-icon">+</span>
+                新規作成
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            {% if month_rows %}
+            <div class="table-responsive">
+                <table class="data-table month-list">
+                    <thead>
+                        <tr>
+                            <th>対象月</th>
+                            <th>収入A</th>
+                            <th>収入B</th>
+                            <th>割合A</th>
+                            <th>割合B</th>
+                            <th>明細数</th>
+                            <th>生活費対象</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in month_rows %}
+                        <tr class="clickable-row" onclick="location.href='{% url 'budgets:month_detail' row.monthly_budget.pk %}'">
+                            <td class="cell-primary">{{ row.monthly_budget.year_month }}</td>
+                            <td>
+                                {% if row.monthly_budget.income_a %}
+                                    ¥{{ row.monthly_budget.income_a|floatformat:0|intcomma }}
+                                {% else %}
+                                    <span class="text-muted">未入力</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.monthly_budget.income_b %}
+                                    ¥{{ row.monthly_budget.income_b|floatformat:0|intcomma }}
+                                {% else %}
+                                    <span class="text-muted">未入力</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ row.ratio_a_percent }}</td>
+                            <td>{{ row.ratio_b_percent }}</td>
+                            <td>{{ row.monthly_budget.transaction_count }}</td>
+                            <td>{{ row.monthly_budget.living_cost_count }}</td>
+                            <td>
+                                <a href="{% url 'budgets:month_detail' row.monthly_budget.pk %}" class="btn btn-sm btn-outline">
+                                    詳細
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">📆</div>
+                <h3 class="empty-title">対象月がありません</h3>
+                <p class="empty-message">「新規作成」ボタンから対象月を作成してください</p>
+                <a href="{% url 'budgets:month_create' %}" class="btn btn-primary">
+                    新規作成
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="page-nav">
+        <a href="{% url 'dashboard' %}" class="btn btn-outline">
+            ← ダッシュボードに戻る
+        </a>
+    </div>
+</div>
+{% endblock %}
+

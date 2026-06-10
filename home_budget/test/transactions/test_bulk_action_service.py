@@ -1,0 +1,68 @@
+"""BulkTransactionActionService のテスト。"""
+import pytest
+
+from transactions.models import Transaction
+from transactions.services import BulkTransactionActionService
+
+
+class Test_BulkTransactionActionService:
+    """明細一括操作サービスの検証。"""
+
+    @pytest.mark.django_db
+    def test_選択が0件のときwarningを返す(
+        self, user_a, user_b, monthly_budget
+    ):
+        mb = monthly_budget(user_a, user_b)
+        result = BulkTransactionActionService().apply(mb, "include", [])
+
+        assert result.level == "warning"
+        assert result.message == "明細を選択してください"
+        assert result.updated_count == 0
+
+    @pytest.mark.django_db
+    def test_不正なactionのときerrorを返す(
+        self, user_a, user_b, monthly_budget, living_cost_transactions
+    ):
+        mb = monthly_budget(user_a, user_b)
+        txs = living_cost_transactions(mb, [(5000, user_a)])
+        result = BulkTransactionActionService().apply(
+            mb, "invalid", [str(txs[0].id)]
+        )
+
+        assert result.level == "error"
+        assert result.message == "不正な操作です"
+
+    @pytest.mark.django_db
+    def test_includeで生活費フラグが更新される(
+        self, user_a, user_b, monthly_budget, living_cost_transactions
+    ):
+        mb = monthly_budget(user_a, user_b)
+        txs = living_cost_transactions(mb, [(5000, user_a)])
+        Transaction.objects.filter(pk=txs[0].pk).update(is_living_cost=False)
+
+        result = BulkTransactionActionService().apply(
+            mb, "include", [str(txs[0].id)]
+        )
+
+        assert result.level == "success"
+        assert result.updated_count == 1
+        assert "生活費に含めました" in result.message
+        txs[0].refresh_from_db()
+        assert txs[0].is_living_cost is True
+
+    @pytest.mark.django_db
+    def test_payer_aで支払者がuser_aに設定される(
+        self, user_a, user_b, monthly_budget, living_cost_transactions
+    ):
+        mb = monthly_budget(user_a, user_b)
+        txs = living_cost_transactions(mb, [(5000, user_b)])
+
+        result = BulkTransactionActionService().apply(
+            mb, "payer_a", [str(txs[0].id)]
+        )
+
+        assert result.level == "success"
+        assert result.updated_count == 1
+        assert user_a.username in result.message
+        txs[0].refresh_from_db()
+        assert txs[0].payer_id == user_a.id
