@@ -1,6 +1,8 @@
-# ローカル環境変数（秘密情報）。テンプレートは env.example / .env.example を参照
-env
+# ローカル環境変数（秘密情報）。テンプレートは .env.example を参照
 .env
+
+# 旧 env ファイル（移行期間の誤コミット防止）
+env
 
 # Python 仮想環境・バイトコード・キャッシュ
 .venv/

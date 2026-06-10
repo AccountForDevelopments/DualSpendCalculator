@@ -14,7 +14,7 @@ services:
       context: .
     container_name: homebudget_app_web
     env_file:
-      - env
+      - .env
     depends_on:
       - db
     volumes:
