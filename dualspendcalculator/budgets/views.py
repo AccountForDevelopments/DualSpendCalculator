@@ -13,6 +13,7 @@ from .models import MonthlyBudget
 from .presenters import (
     build_income_ratio_context,
     build_month_detail_section_context,
+    build_month_list_column_labels,
     build_month_list_rows,
 )
 from .services import AgreementRequestValidator, SettlementCalculator
@@ -25,9 +26,15 @@ class MonthListView(LoginRequiredMixin, ListView):
     context_object_name = "months"
     ordering = ["-year_month"]
 
+    def get_queryset(self):
+        return MonthlyBudget.objects.select_related("user_a", "user_b")
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["month_rows"] = build_month_list_rows(context["months"])
+        months = context["months"]
+        context["month_rows"] = build_month_list_rows(months)
+        first_month = months[0] if months else None
+        context["column_labels"] = build_month_list_column_labels(first_month)
         return context
 
 

@@ -725,7 +725,6 @@ a:hover {
     background: var(--color-bg);
     font-weight: 600;
     color: var(--color-text-light);
-    text-transform: uppercase;
     font-size: var(--font-size-xs);
     letter-spacing: 0.05em;
 }
