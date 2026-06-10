@@ -19,6 +19,10 @@ services:
       - db
     volumes:
       - ./dualspendcalculator:/app/dualspendcalculator
+      - ./manage.py:/app/manage.py
+      - ./pytest.ini:/app/pytest.ini
+      - ./conftest.py:/app/conftest.py
+      - ./tests:/app/tests
     ports:
       - "${HOST_WEB_PORT:-8000}:8000"
     command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]

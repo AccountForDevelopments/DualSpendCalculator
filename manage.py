@@ -1,9 +1,13 @@
 #!/usr/bin/env python
 import os
 import sys
+from pathlib import Path
 
 
 def main():
+    project_root = Path(__file__).resolve().parent
+    sys.path.insert(0, str(project_root / "dualspendcalculator"))
+
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
     try:
         from django.core.management import execute_from_command_line
@@ -18,6 +22,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
