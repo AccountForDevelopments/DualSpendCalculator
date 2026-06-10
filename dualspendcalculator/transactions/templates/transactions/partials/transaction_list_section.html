@@ -48,24 +48,44 @@
             <input type="hidden" name="filter_params" value="{{ filter_params }}">
             
             <!-- 一括操作ボタン -->
-            <div class="bulk-actions">
+            <div class="bulk-actions bulk-actions--inactive">
                 <div class="bulk-buttons">
-                    <button type="submit" name="action" value="include" class="btn btn-success btn-sm">
+                    <button type="submit"
+                            name="action"
+                            value="include"
+                            class="btn btn-primary btn-sm bulk-action-btn"
+                            disabled
+                            title="1件以上選択してください">
                         生活費に含める
                     </button>
-                    <button type="submit" name="action" value="exclude" class="btn btn-outline btn-sm">
+                    <button type="submit"
+                            name="action"
+                            value="exclude"
+                            class="btn btn-outline btn-sm bulk-action-btn"
+                            disabled
+                            title="1件以上選択してください">
                         生活費から除外
                     </button>
-                    <button type="submit" name="action" value="payer_a" class="btn btn-info btn-sm">
+                    <button type="submit"
+                            name="action"
+                            value="payer_a"
+                            class="btn btn-outline btn-sm bulk-action-btn"
+                            disabled
+                            title="1件以上選択してください">
                         {{ month.user_a.username }}が支払い
                     </button>
-                    <button type="submit" name="action" value="payer_b" class="btn btn-info btn-sm">
+                    <button type="submit"
+                            name="action"
+                            value="payer_b"
+                            class="btn btn-outline btn-sm bulk-action-btn"
+                            disabled
+                            title="1件以上選択してください">
                         {{ month.user_b.username }}が支払い
                     </button>
                     <span class="bulk-btn-separator">|</span>
                     <button type="button"
                             id="btn-agreement"
-                            class="btn btn-warning btn-sm"
+                            class="btn btn-outline btn-sm bulk-action-btn"
                             disabled
                             title="1件以上選択してください"
                             data-agreement-url="{% url 'budgets:agreement_download' %}"

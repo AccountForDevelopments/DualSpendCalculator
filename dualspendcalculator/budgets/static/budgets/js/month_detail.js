@@ -18,15 +18,24 @@ function initSelectAll() {
     const selectAll = document.getElementById('select-all');
     const selectRows = document.querySelectorAll('.select-row');
     const selectedCount = document.querySelector('.selected-count');
+    const bulkActions = document.querySelector('.bulk-actions');
+    const emptyTitle = '1件以上選択してください';
 
     function updateSelectedCount() {
         const count = document.querySelectorAll('.select-row:checked').length;
-        selectedCount.textContent = count + '件選択中';
+        const isEmpty = count === 0;
 
-        const agreementBtn = document.getElementById('btn-agreement');
-        if (agreementBtn) {
-            agreementBtn.disabled = count === 0;
-            agreementBtn.title = count === 0 ? '1件以上選択してください' : '';
+        if (selectedCount) {
+            selectedCount.textContent = count + '件選択中';
+        }
+
+        document.querySelectorAll('.bulk-action-btn').forEach(btn => {
+            btn.disabled = isEmpty;
+            btn.title = isEmpty ? emptyTitle : '';
+        });
+
+        if (bulkActions) {
+            bulkActions.classList.toggle('bulk-actions--inactive', isEmpty);
         }
     }
 
@@ -44,6 +53,8 @@ function initSelectAll() {
             updateSelectedCount();
         });
     });
+
+    updateSelectedCount();
 }
 
 /**

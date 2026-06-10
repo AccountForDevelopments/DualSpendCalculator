@@ -1114,6 +1114,14 @@ a:hover {
     color: var(--color-primary);
 }
 
+.bulk-actions--inactive {
+    opacity: 0.85;
+}
+
+.bulk-actions--inactive .selected-count {
+    color: var(--color-text-light);
+}
+
 /* Transaction Table */
 .transaction-table .cell-checkbox {
     width: 40px;
