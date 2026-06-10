@@ -1,195 +1,196 @@
-# HomeBudgetApp
+# DualSpendCalculator
 
-このリポジトリは、家計簿アプリケーションのソースコードを管理しています。アプリ本体は **PMF（Product-Market Fit）達成後版**として、実際に使用する本番環境と再利用可能なアーキテクチャを目指しています。
+家計簿アプリケーションのソースコードを管理するリポジトリです。
+この README は、**Docker のみ**でローカル環境を起動し、ブラウザでログイン画面を確認できるところまでを再現する手順書です。
 
-## 📁 ディレクトリ構成
+## 前提条件
 
-```
-HomeBudgetApp/
-├── home_budget/          # Django プロジェクト（PMF達成後版アーキテクチャ）
-│   ├── common/           # 共通基盤
-│   ├── budgets/          # 予算・精算
-│   ├── transactions/     # 取引明細
-│   └── csv_import/       # CSVインポート
-├── compose.yaml
-├── Dockerfile
-├── requirements.txt
-├── libs/                 # 共通ライブラリ（予定）
-└── docs/                 # ドキュメント（予定）
-```
+| 項目 | 要件 |
+|------|------|
+| Docker | Docker Desktop、または Docker Engine + Compose v2 |
+| Compose コマンド | `docker compose`（`docker-compose` ではない） |
+| 空きポート | デフォルト `8000`（`.env` で変更可能） |
+| OS | macOS / Linux / Windows（WSL2 推奨） |
 
-## 📁 アーキテクチャ
-
-**4アプリ構造**:
-
-| アプリ | 責務 | 依存関係 |
-|--------|------|---------|
-| `common` | 共通ユーティリティ（text, env） | なし（最も安定） |
-| `budgets` | 月次予算管理 + 精算ダッシュボード | common |
-| `transactions` | 取引明細管理 | common, budgets |
-| `csv_import` | CSVインポート機能 | common, transactions |
-
-**設計判断**:
-- `common`: 共通コードを格納（安定依存の原則）
-- `accounts`: 削除 → 認証URLを `config/urls.py` に統合
-- `settlements`: 削除 → `budgets` アプリに統合
-
-## 🏗️ 適用した設計原則
-
-| 原則 | 適用内容 |
-|------|---------|
-| **DIP（依存性逆転）** | Protocol で抽象を定義、アダプターで実装 |
-| **SDP（安定依存）** | common が最も安定、他が依存 |
-| **CCP（共通閉鎖）** | 同じ理由で変更されるコードを同じアプリに |
-| **ポートとアダプター** | 外部連携を差し替え可能に |
-
-## 📂 ディレクトリ構造（home_budget）
-
-```
-home_budget/
-├── common/                 # 共通ユーティリティ
-│   ├── text/               # テキスト処理
-│   │   ├── encoding.py     # 文字コード判定
-│   │   └── parsing.py      # 日付・金額パース
-│   └── env.py              # 環境変数の解釈
-│
-├── budgets/                # 月次予算
-│   ├── services/           # ビジネスロジック
-│   ├── static/budgets/     # 画面専用 JS など
-│   └── templates/budgets/  # アプリ固有テンプレート
-│
-├── transactions/           # 取引明細
-│   └── templates/transactions/
-│
-├── csv_import/             # CSVインポート
-│   ├── ports.py            # Protocol 定義
-│   ├── adapters.py         # Django ORM 実装
-│   └── services/           # 取込サービス・パーサ・結果 DTO
-│
-├── static/                 # 共通静的ファイル（CSS など）
-└── templates/              # 共通テンプレート（base.html など）
-```
-
-### テンプレート・静的ファイルの配置
-
-| 種別 | 置き場 | 例 |
-|------|--------|-----|
-| 共通テンプレート | `home_budget/templates/` | `base.html`, `registration/login.html` |
-| アプリ固有テンプレート | `<app>/templates/<app>/` | `budgets/templates/budgets/month_detail.html` |
-| 共通静的ファイル | `home_budget/static/` | `css/style.css` |
-| 画面専用 JS | その画面を持つアプリの `<app>/static/<app>/` | `budgets/static/budgets/js/month_detail.js` |
-
-## 🚀 起動方法
-
-Docker と環境ファイルはリポジトリ直下にあります。手順はリポジトリのルート（`HomeBudgetApp/`）をカレントにして実行します。
-
-### 1. 環境ファイルを作成（初回のみ）
+セットアップ前に、次のコマンドが通ることを確認してください。
 
 ```bash
-cp env.example env
+docker --version
+docker compose version
 ```
 
-### 2. コンテナを起動
+## クイックスタート（初回セットアップ）
+
+以下のコマンドは、すべて**リポジトリルート**（`DualSpendCalculator/`）で実行します。
+
+### 1. リポジトリを取得
+
+```bash
+git clone <repository-url>
+cd DualSpendCalculator
+```
+
+### 2. 環境変数ファイルを作成
+
+```bash
+cp .env.example .env
+```
+
+`.env` は git 管理外です。秘密情報やポート番号の変更は `.env` に記述します。
+
+`.env` は次の 2 用途で使われます。
+
+- Docker Compose の変数置換（`${HOST_WEB_PORT}` など）
+- `web` コンテナへの環境変数注入（`env_file`）
+
+### 3. コンテナをビルド・起動
 
 ```bash
 docker compose up --build -d
 ```
 
-### 3. 初期化（初回のみ）
+**成功の目安**: `docker compose ps` で `web` と `db` の STATUS が `Up` になる。
+
+```bash
+docker compose ps
+```
+
+想定されるコンテナ名:
+
+| サービス | コンテナ名 |
+|----------|-----------|
+| Django（web） | `dualspendcalculator_web` |
+| PostgreSQL（db） | `dualspendcalculator_db` |
+
+### 4. DB マイグレーション（初回のみ）
 
 ```bash
 docker compose exec web python manage.py migrate
+```
+
+**成功の目安**: `Applying ... OK` が表示される。
+
+### 5. 管理者ユーザーを作成（初回のみ）
+
+```bash
 docker compose exec web python manage.py createsuperuser
 ```
 
-> **📌 補足**: マイグレーションとユーザー作成は**初回のみ**必要です。  
-> データは Docker ボリュームに永続化されるため、2回目以降の起動では不要です。
+対話形式でユーザー名・メールアドレス・パスワードを入力します。
 
-### 4. 動作確認
+### 6. 動作確認
 
-ブラウザで `http://localhost:8000/` にアクセスしてください（ホスト側ポートを変えた場合はその番号に読み替えてください）。ログイン画面が表示されれば起動成功です。
+ブラウザで次の URL を開きます。
 
-### ポート 8000 が既に使われている場合
-
-`Bind for 0.0.0.0:8000 failed: port is already allocated` は、**別のコンテナやプロセスがすでにホストの 8000 番を掴んでいる**ときに出ます。リネーム前のスタック（例: `homebudget_pmf_web`）が残っているケースが多いです。
-
-1. `docker ps` で `0.0.0.0:8000->8000/tcp` のコンテナを確認し、`docker stop <コンテナ名>` で止めるか、旧プロジェクトのディレクトリで `docker compose down` を実行する。
-2. 止められない・両方動かしたい場合は、ホスト側だけ別ポートを指定して起動する。
-
-```bash
-HOST_WEB_PORT=8001 docker compose up --build -d
+```
+http://localhost:8000/
 ```
 
-このときブラウザでは `http://localhost:8001/` を開きます。`compose.yaml` の `${HOST_WEB_PORT:-8000}` は、シェルの環境変数または同じディレクトリの `.env`（Compose が読むファイル）から解決されます。
+**成功の目安**: ログイン画面が表示される。
 
-## 🔍 確認コマンド
+## 2 回目以降の起動
+
+```bash
+docker compose up -d
+```
+
+マイグレーションと管理者ユーザー作成は不要です。PostgreSQL のデータは Docker ボリューム `dualspendcalculator_postgres_data` に永続化されます。
+
+## 環境変数リファレンス
+
+`.env.example` をコピーした `.env` で設定します。
+
+| 変数名 | デフォルト | 用途 |
+|--------|-----------|------|
+| `HOST_WEB_PORT` | `8000` | ホスト側の公開ポート |
+| `DJANGO_SECRET_KEY` | `django-insecure-change-me` | Django 秘密鍵（本番では必ず変更） |
+| `DJANGO_DEBUG` | `1` | デバッグモード（`1` = 有効） |
+| `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1` | 許可ホスト（カンマ区切り） |
+| `POSTGRES_DB` | `dualspendcalculator` | DB 名（`db` コンテナの初期化に使用） |
+| `POSTGRES_USER` | `dualspendcalculator` | DB ユーザー |
+| `POSTGRES_PASSWORD` | `dualspendcalculator` | DB パスワード |
+| `DATABASE_URL` | `postgresql://dualspendcalculator:dualspendcalculator@db:5432/dualspendcalculator` | `web` コンテナの DB 接続先 |
+
+`DATABASE_URL` のホスト名は `db`（Compose のサービス名）です。`localhost` ではありません。
+
+## よく使うコマンド
+
+リポジトリルートで実行します。
 
 ```bash
 # コンテナの状態確認
 docker compose ps
 
-# ログ確認
+# web コンテナのログ確認（直近 50 行）
 docker compose logs web --tail 50
+
+# db コンテナのログ確認（直近 50 行）
+docker compose logs db --tail 50
 
 # コンテナ停止（データは保持）
 docker compose down
 
-# コンテナ停止 + ボリューム削除（データも削除）
+# コンテナ停止 + ボリューム削除（DB データも削除）
 docker compose down -v
 ```
 
-## テストの実行方法
+`docker compose down -v` は DB データを完全に消去します。初回セットアップからやり直す場合にのみ使用してください。
 
-テストは **`home_budget/`** をカレントにして実行します（仮想環境はリポジトリ直下の `.venv` を想定）。
+## トラブルシューティング
 
-### 1. 仮想環境の準備（初回のみ）
+### ポート 8000 が既に使われている
 
-```bash
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-```
+`Bind for 0.0.0.0:8000 failed: port is already allocated` は、別のコンテナやプロセスがホストの 8000 番ポートを使用しているときに発生します。
 
-### 2. テストの実行
+**対処 1**: 競合しているコンテナを停止する。
 
 ```bash
-cd home_budget
-../.venv/bin/python -m pytest -v
+docker ps
+docker stop <コンテナ名>
 ```
 
-- 上記コマンドで **`test/` 配下の全テスト**（精算・同意書・conftest 確認を含む）が実行される（`pytest.ini` の `testpaths = test`）
-- マーカー付きテストのみ: `../.venv/bin/python -m pytest -m slow -v`
-- 仮想環境を有効化してから実行する場合:
-  ```bash
-  source .venv/bin/activate && cd home_budget && pytest -v
-  ```
+**対処 2**: ホスト側ポートを変更して起動する。
 
-**DB を使うテスト**（`@pytest.mark.django_db` 付き）を実行する場合は、先にリポジトリ直下で `docker compose up -d` により DB を起動するか、`DATABASE_URL` をローカル用に設定してください。
+`.env` を編集:
 
-## デプロイ・運用の予定
+```
+HOST_WEB_PORT=8001
+```
 
-現在は localhost + Docker で開発しています。開発が一区切りしたら、Tailscale によるプライベートネットワークへ切り替え、スマホ等からも安全にアクセスできるようにする予定です。詳細は [docs/whole_flow/2026-03-14_deployment_plan.md](docs/whole_flow/2026-03-14_deployment_plan.md) を参照してください。
+または、一時的に環境変数を指定:
 
-## 📝 特徴
+```bash
+HOST_WEB_PORT=8001 docker compose up --build -d
+```
 
-- **再利用可能**: csv_import は別プロジェクトで再利用可能
-- **テスト容易**: アダプターをモックに差し替え可能
-- **明確な責務分離**: 各アプリの責務が明確
+この場合、ブラウザでは `http://localhost:8001/` を開きます。
 
-## 🔌 再利用方法
+### コンテナが起動しない
 
-別プロジェクトで csv_import を使う場合：
+```bash
+docker compose logs web
+docker compose logs db
+```
 
-```python
-# my_project/adapters.py
-from csv_import.ports import TransactionRepository
+`.env` がリポジトリルートに存在するか確認してください（`cp .env.example .env`）。
 
-class MyRepository:
-    def exists_by_hash(self, h): ...
-    def create(self, data, h): ...
-    def generate_hash(self, d, desc, amt): ...
+### DB 接続エラー
 
-# 使用
-from csv_import.services import CSVImportService
-repository = MyRepository()
-service = CSVImportService(repository)
+1. `docker compose ps` で `db` が `Up` であることを確認する。
+2. `.env` の `DATABASE_URL` と `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` が整合していることを確認する。
+
+### ログイン画面は出るが操作でエラーになる
+
+マイグレーション未実行の可能性があります。
+
+```bash
+docker compose exec web python manage.py migrate
+```
+
+### 管理者ユーザーでログインできない
+
+`createsuperuser` が未実行、または別ユーザーで作成した可能性があります。
+
+```bash
+docker compose exec web python manage.py createsuperuser
 ```
