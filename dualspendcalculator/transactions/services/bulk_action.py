@@ -20,6 +20,7 @@ class BulkActionResult:
     level: MessageLevel
     message: str
     updated_count: int = 0
+    updated_transactions: list[dict] | None = None
 
 
 class BulkTransactionActionService:
@@ -58,21 +59,44 @@ class BulkTransactionActionService:
                 updated_count=count,
             )
         if action == "payer_a":
-            transactions.update(payer=monthly_budget.user_a)
-            return BulkActionResult(
-                level="success",
-                message=f"{count}件の支払者を{monthly_budget.user_a.username}に設定しました",
-                updated_count=count,
+            return self._apply_payer_update(
+                transactions,
+                payer=monthly_budget.user_a,
+                username_for_message=monthly_budget.user_a.username,
             )
         if action == "payer_b":
-            transactions.update(payer=monthly_budget.user_b)
-            return BulkActionResult(
-                level="success",
-                message=f"{count}件の支払者を{monthly_budget.user_b.username}に設定しました",
-                updated_count=count,
+            return self._apply_payer_update(
+                transactions,
+                payer=monthly_budget.user_b,
+                username_for_message=monthly_budget.user_b.username,
             )
 
         return BulkActionResult(
             level="error",
             message="不正な操作です",
+        )
+
+    def _apply_payer_update(
+        self,
+        transactions,
+        *,
+        payer,
+        username_for_message: str,
+    ) -> BulkActionResult:
+        """支払者を一括更新し、Ajax 用の更新明細リストを返す。"""
+        tx_ids = list(transactions.values_list("id", flat=True))
+        count = len(tx_ids)
+        transactions.update(payer=payer)
+        updated_transactions = [
+            {
+                "id": tx.id,
+                "payer_username": tx.payer.username if tx.payer else None,
+            }
+            for tx in Transaction.objects.filter(id__in=tx_ids).select_related("payer")
+        ]
+        return BulkActionResult(
+            level="success",
+            message=f"{count}件の支払者を{username_for_message}に設定しました",
+            updated_count=count,
+            updated_transactions=updated_transactions,
         )

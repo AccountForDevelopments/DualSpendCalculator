@@ -66,3 +66,20 @@ class Test_BulkTransactionActionService:
         assert user_a.username in result.message
         txs[0].refresh_from_db()
         assert txs[0].payer_id == user_a.id
+
+    @pytest.mark.django_db
+    def test_payer_aでupdated_transactionsが返る(
+        self, user_a, user_b, monthly_budget, living_cost_transactions
+    ):
+        mb = monthly_budget(user_a, user_b)
+        txs = living_cost_transactions(mb, [(5000, None), (3000, user_b)])
+
+        result = BulkTransactionActionService().apply(
+            mb, "payer_a", [str(txs[0].id), str(txs[1].id)]
+        )
+
+        assert result.updated_transactions is not None
+        assert len(result.updated_transactions) == 2
+        updated_by_id = {item["id"]: item["payer_username"] for item in result.updated_transactions}
+        assert updated_by_id[txs[0].id] == user_a.username
+        assert updated_by_id[txs[1].id] == user_a.username

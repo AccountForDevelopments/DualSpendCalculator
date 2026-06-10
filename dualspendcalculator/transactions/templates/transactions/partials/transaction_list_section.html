@@ -66,18 +66,16 @@
                             title="1件以上選択してください">
                         生活費から除外
                     </button>
-                    <button type="submit"
-                            name="action"
-                            value="payer_a"
-                            class="btn btn-outline btn-sm bulk-action-btn"
+                    <button type="button"
+                            class="btn btn-outline btn-sm bulk-action-btn bulk-payer-btn"
+                            data-action="payer_a"
                             disabled
                             title="1件以上選択してください">
                         {{ month.user_a.username }}が支払い
                     </button>
-                    <button type="submit"
-                            name="action"
-                            value="payer_b"
-                            class="btn btn-outline btn-sm bulk-action-btn"
+                    <button type="button"
+                            class="btn btn-outline btn-sm bulk-action-btn bulk-payer-btn"
+                            data-action="payer_b"
                             disabled
                             title="1件以上選択してください">
                         {{ month.user_b.username }}が支払い
@@ -131,7 +129,7 @@
                                 <span class="badge badge-muted">-</span>
                                 {% endif %}
                             </td>
-                            <td>
+                            <td class="cell-payer">
                                 {% if tx.payer %}
                                 <span class="badge badge-payer">{{ tx.payer.username }}</span>
                                 {% else %}

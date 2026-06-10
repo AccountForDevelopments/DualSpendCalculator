@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.views.generic import RedirectView, UpdateView, View
@@ -63,8 +64,23 @@ class BulkActionView(LoginRequiredMixin, View):
         selected_ids = request.POST.getlist("selected")
 
         result = BulkTransactionActionService().apply(month, action, selected_ids)
+        if self._is_ajax_request(request):
+            return self._json_response(result)
         getattr(messages, result.level)(request, result.message)
         return self._redirect_with_filters(request, pk)
+
+    def _is_ajax_request(self, request) -> bool:
+        return request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
+    def _json_response(self, result):
+        payload = {
+            "level": result.level,
+            "message": result.message,
+            "updated_count": result.updated_count,
+        }
+        if result.updated_transactions is not None:
+            payload["updated"] = result.updated_transactions
+        return JsonResponse(payload)
 
     def _redirect_with_filters(self, request, pk):
         """フィルタパラメータを保持してリダイレクト"""
